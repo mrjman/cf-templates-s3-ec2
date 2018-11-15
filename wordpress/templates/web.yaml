@@ -522,8 +522,6 @@ Resources:
               httpd24: []
               mysql56: []
               php55: []
-              php55-devel: []
-              php55-pear: []
               php55-mysqlnd: []
           files:
             /tmp/create_site_conf.sh:
@@ -560,15 +558,14 @@ Resources:
               content:
                 !Sub |
                   #!/bin/bash -xe
-                  pecl install igbinary
                   wget -P /tmp/ https://s3.amazonaws.com/aws-refarch/wordpress/latest/bits/AmazonElastiCacheClusterClient-1.0.1-PHP55-64bit.tgz
                   tar -xf '/tmp/AmazonElastiCacheClusterClient-1.0.1-PHP55-64bit.tgz'
                   cp '/tmp/AmazonElastiCacheClusterClient-1.0.0/amazon-elasticache-cluster-client.so' /usr/lib64/php/5.5/modules/
                   if [ ! -f /etc/php-5.5.d/50-memcached.ini ]; then
                       touch /etc/php-5.5.d/50-memcached.ini
                   fi
-                  echo 'extension=igbinary.so;' >> /etc/php-5.5.d/50-memcached.ini
-                  echo 'extension=/usr/lib64/php/5.5/modules/amazon-elasticache-cluster-client.so;' >> /etc/php-5.5.d/50-memcached.ini
+                  sed -i '3i extension=/usr/lib64/php/5.5/modules/amazon-elasticache-cluster-client.so;' /etc/php-5.5.d/50-memcached.ini
+                  sed -i '3i extension=igbinary.so;' /etc/php-5.5.d/50-memcached.ini
               mode: 000500
               owner: root
               group: root
@@ -729,8 +726,6 @@ Resources:
               httpd24: []
               mysql56: []
               php56: []
-              php56-devel: []
-              php56-pear: []
               php56-mysqlnd: []
           files:
             /tmp/create_site_conf.sh:
@@ -767,15 +762,14 @@ Resources:
               content:
                 !Sub |
                   #!/bin/bash -xe
-                  pecl install igbinary
                   wget -P /tmp/ https://s3.amazonaws.com/aws-refarch/wordpress/latest/bits/AmazonElastiCacheClusterClient-1.0.0-PHP56-64bit.tgz
                   tar -xf '/tmp/AmazonElastiCacheClusterClient-1.0.0-PHP56-64bit.tgz'
                   cp '/tmp/AmazonElastiCacheClusterClient-1.0.0/amazon-elasticache-cluster-client.so' /usr/lib64/php/5.6/modules/
                   if [ ! -f /etc/php-5.6.d/50-memcached.ini ]; then
                       touch /etc/php-5.6.d/50-memcached.ini
                   fi
-                  echo 'extension=igbinary.so;' >> /etc/php-5.6.d/50-memcached.ini
-                  echo 'extension=/usr/lib64/php/5.6/modules/amazon-elasticache-cluster-client.so;' >> /etc/php-5.6.d/50-memcached.ini
+                  sed -i '3i extension=/usr/lib64/php/5.6/modules/amazon-elasticache-cluster-client.so;' /etc/php-5.6.d/50-memcached.ini
+                  sed -i '3i extension=igbinary.so;' /etc/php-5.6.d/50-memcached.ini
               mode: 000500
               owner: root
               group: root
@@ -827,7 +821,6 @@ Resources:
                     "       wp core download --version='", !Ref WPVersion, "' --locale='", !Ref WPLocale, "' --allow-root\n",
                     "       wp core config --dbname='", !Ref DatabaseName, "' --dbuser='", !Ref DatabaseMasterUsername, "' --dbpass='", !Ref DatabaseMasterPassword, "' --dbhost='", !Ref DatabaseClusterEndpointAddress, "' --dbprefix=wp_ --allow-root\n",
                     "       wp core install --url=", !If [ NoWPDomainName, !Ref PublicAlbHostname, !Join [ "", [ "'http://www.", !Ref WPDomainName, "'" ] ] ], " --title='", !Ref WPTitle, "' --admin_user='", !Ref WPAdminUsername, "' --admin_password='", !Ref WPAdminPassword, "' --admin_email='", !Ref WPAdminEmail, "' --skip-email --allow-root\n",
-                    "       wp plugin install w3-total-cache --allow-root\n",
                     "       sed -i \"/$table_prefix = 'wp_';/ a \\define('WP_HOME', 'http://' . \\$_SERVER['HTTP_HOST']); \" /var/www/wordpress/", !Ref WPDirectory, "/wp-config.php\n",
                     "       sed -i \"/$table_prefix = 'wp_';/ a \\define('WP_SITEURL', 'http://' . \\$_SERVER['HTTP_HOST']); \" /var/www/wordpress/", !Ref WPDirectory, "/wp-config.php\n",
                     "       # enable HTTPS in wp-config.php if ACM Public SSL Certificate parameter was not empty\n",
@@ -920,7 +913,6 @@ Resources:
       AWS::CloudFormation::Init:
         configSets:
           deploy_webserver:
-            - configure_cfn
             - install_webserver
             - build_cacheclient
             - build_wordpress
@@ -931,35 +923,6 @@ Resources:
             - install_wordpress
             - install_opcache
             - start_webserver
-        configure_cfn:
-          files:
-            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
-              content: !Sub |
-                [cfn-auto-reloader-hook]
-                triggers=post.update
-                path=Resources.WebLaunchConfiguration70.Metadata.AWS::CloudFormation::Init
-                action=/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource EC2 --configsets deploy_webserver --region ${AWS::Region}
-              mode: "000400"
-              owner: root
-              group: root
-            /etc/cfn/cfn-hup.conf:
-              content: !Sub |
-                [main]
-                stack=${AWS::StackId}
-                region=${AWS::Region}
-                verbose=true
-                interval=5
-              mode: "000400"
-              owner: root
-              group: root
-          services:
-            sysvinit:
-              cfn-hup:
-                enabled: "true"
-                ensureRunning: "true"
-                files:
-                  - "/etc/cfn/cfn-hup.conf"
-                  - "/etc/cfn/hooks.d/cfn-auto-reloader.conf"
         install_webserver:
           packages:
             yum:
@@ -967,8 +930,6 @@ Resources:
               httpd24: []
               mysql56: []
               php70: []
-              php70-devel: []
-              php7-pear: []
               php70-mysqlnd: []
           files:
             /tmp/create_site_conf.sh:
@@ -1005,16 +966,14 @@ Resources:
               content:
                 !Sub |
                   #!/bin/bash -xe
-                  ln -s /usr/bin/pecl7 /usr/bin/pecl #just so pecl is available easily
-                  pecl7 install igbinary
                   wget -P /tmp/ https://s3.amazonaws.com/aws-refarch/wordpress/latest/bits/AmazonElastiCacheClusterClient-2.0.1-PHP70-64bit.tar.gz
                   tar -xf '/tmp/AmazonElastiCacheClusterClient-2.0.1-PHP70-64bit.tar.gz'
                   cp '/tmp/artifact/amazon-elasticache-cluster-client.so' /usr/lib64/php/7.0/modules/
                   if [ ! -f /etc/php-7.0.d/50-memcached.ini ]; then
                       touch /etc/php-7.0.d/50-memcached.ini
                   fi
-                  echo 'extension=igbinary.so;' >> /etc/php-7.0.d/50-memcached.ini
-                  echo 'extension=/usr/lib64/php/7.0/modules/amazon-elasticache-cluster-client.so;' >> /etc/php-7.0.d/50-memcached.ini
+                  sed -i '3i extension=/usr/lib64/php/7.0/modules/amazon-elasticache-cluster-client.so;' /etc/php-7.0.d/50-memcached.ini
+                  sed -i '3i extension=igbinary.so;' /etc/php-7.0.d/50-memcached.ini
               mode: 000500
               owner: root
               group: root
@@ -1066,7 +1025,6 @@ Resources:
                     "       wp core download --version='", !Ref WPVersion, "' --locale='", !Ref WPLocale, "' --allow-root\n",
                     "       wp core config --dbname='", !Ref DatabaseName, "' --dbuser='", !Ref DatabaseMasterUsername, "' --dbpass='", !Ref DatabaseMasterPassword, "' --dbhost='", !Ref DatabaseClusterEndpointAddress, "' --dbprefix=wp_ --allow-root\n",
                     "       wp core install --url=", !If [ NoWPDomainName, !Ref PublicAlbHostname, !Join [ "", [ "'http://www.", !Ref WPDomainName, "'" ] ] ], " --title='", !Ref WPTitle, "' --admin_user='", !Ref WPAdminUsername, "' --admin_password='", !Ref WPAdminPassword, "' --admin_email='", !Ref WPAdminEmail, "' --skip-email --allow-root\n",
-                    "       wp plugin install w3-total-cache --allow-root\n",
                     "       sed -i \"/$table_prefix = 'wp_';/ a \\define('WP_HOME', 'http://' . \\$_SERVER['HTTP_HOST']); \" /var/www/wordpress/", !Ref WPDirectory, "/wp-config.php\n",
                     "       sed -i \"/$table_prefix = 'wp_';/ a \\define('WP_SITEURL', 'http://' . \\$_SERVER['HTTP_HOST']); \" /var/www/wordpress/", !Ref WPDirectory, "/wp-config.php\n",
                     "       # enable HTTPS in wp-config.php if ACM Public SSL Certificate parameter was not empty\n",
@@ -1147,11 +1105,10 @@ Resources:
         "Fn::Base64":
           !Sub |
             #!/bin/bash -xe
-            yum update -y aws-cfn-bootstrap
+            yum update -y
             mkdir -p /var/www/wordpress
             mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 ${ElasticFileSystem}.efs.${AWS::Region}.amazonaws.com:/ /var/www/wordpress
             /opt/aws/bin/cfn-init --configsets deploy_webserver --verbose --stack ${AWS::StackName} --resource WebLaunchConfiguration70 --region ${AWS::Region}
-            yum update -y
             /opt/aws/bin/cfn-signal --exit-code $? --stack ${AWS::StackName} --resource WebAutoScalingGroup --region ${AWS::Region}
 
 
