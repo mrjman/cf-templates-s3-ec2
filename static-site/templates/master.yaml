@@ -1,0 +1,296 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Metadata:
+  Author: Mondo Robot
+
+Parameters:
+  ApiBaseUrl:
+    Description: Base api url
+    Default: 'http://ec2-54-71-48-148.us-west-2.compute.amazonaws.com/index.php/wp-json/wp/v2'
+    Type: String
+  ApiMenuUrl:
+    Description: Menu api url
+    Default: 'http://ec2-54-71-48-148.us-west-2.compute.amazonaws.com/index.php/wp-json/wp-api-menus/v2/menus'
+    Type: String
+  ApiNavMenuUrl:
+    Description: Main nav api url
+    Default: 'http://ec2-54-71-48-148.us-west-2.compute.amazonaws.com/index.php/wp-json/wp-api-menus/v2/menu-locations'
+    Type: String
+  ApiMediaUrl:
+    Description: Media url
+    Default: 'http://ec2-54-71-48-148.us-west-2.compute.amazonaws.com/wp-content/uploads'
+    Type: String
+  ApiArtistsUrl:
+    Description: Arists data url
+    Default: 'https://s3.amazonaws.com/goeventweb-static.greencopper.com/8b22db9b97ce4d4b864a42f401f87e73/coachella-2018/data/eng/artists.json'
+    Type: String
+  BuildImage:
+    Description: Build machine image
+    Default: 'aws/codebuild/nodejs:10.1.0'
+    Type: String
+  BuildComputeType:
+    Description: Build machine compute type
+    Default: BUILD_GENERAL1_SMALL
+    Type: String
+  BuildType:
+    Description: Build machine type
+    Default: LINUX_CONTAINER
+    Type: String
+  CdnUrl:
+    Description: CDN url
+    Default: 'https://d1xidugad9lo1d.cloudfront.net'
+    Type: String
+  GithubOwnerAccount:
+    Description: Github owner account. Can be found in github url /<owner>/<repo>
+    Default: mondorobot
+    Type: String
+  GithubBranch:
+    Description: Github branch
+    Default: develop
+    Type: String
+  GithubOAuthToken:
+    Description: Personal access token attached to the github account for repo access
+    NoEcho: true
+    Type: String
+  GithubRepo:
+    Description: Githut repo name
+    Type: String
+  PipelineBucket:
+    Description: The bucket name to store pipeline artifacts
+    Default: ''
+    Type: String
+  PipelineName:
+    Description: The name of the code pipeline
+    Default: coachella-static-pipeline
+    Type: String
+  SiteBucketName:
+    Description: The name to use when generating the S3 bucket for the static site
+    Default: coachella-static
+    Type: String
+
+Conditions:
+  NoPipelineBucket: !Equals [ '', !Ref PipelineBucket ]
+  NoSiteBucketName: !Equals [ '', !Ref SiteBucketName ]
+
+Resources:
+  SiteBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !If [ NoSiteBucketName, !Ref 'AWS::NoValue', !Ref SiteBucketName ]
+
+  CodeBuild:
+    Type: 'AWS::CodeBuild::Project'
+    Properties:
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: !Ref BuildComputeType
+        EnvironmentVariables:
+          - Name: NUXT_ENV_API_BASE_URL
+            Value: !Ref ApiBaseUrl
+            Type: PLAINTEXT
+          - Name: NUXT_ENV_API_MENUS_URL
+            Value: !Ref ApiMenuUrl
+            Type: PLAINTEXT
+          - Name: NUXT_ENV_API_NAVMENU_URL
+            Value: !Ref ApiNavMenuUrl
+            Type: PLAINTEXT
+          - Name: NUXT_ENV_API_MEDIA_URL
+            Value: !Ref ApiMediaUrl
+            Type: PLAINTEXT
+          - Name: NUXT_ENV_CDN_URL
+            Value: !Ref CdnUrl
+            Type: PLAINTEXT
+          - Name: NUXT_ENV_GC_ARTISTS
+            Value: !Ref ApiArtistsUrl
+            Type: PLAINTEXT
+        Image: !Ref BuildImage
+        Type: !Ref BuildType
+      Name: !Sub ${AWS::StackName}-CodeBuild
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: !Sub |
+          version: 0.2
+          phases:
+            pre_build:
+              commands:
+                - echo Installing NPM packages
+                - npm install
+            build:
+              commands:
+                - echo Build started on `date`
+                - npm run generate
+            post_build:
+              commands:
+                # sync contents to S3
+                - aws s3 sync --delete dist/ s3://${SiteBucket}/
+                # set cache-control headers for non html files
+                - >
+                  aws s3 cp s3://${SiteBucket}/ s3://${SiteBucket}/
+                  --exclude "*.html" --recursive --metadata-directive REPLACE
+                  --acl public-read --cache-control="max-age=31536000, public"
+                # set cache-control headers for html files
+                - >
+                  aws s3 cp s3://${SiteBucket}/ s3://${SiteBucket}/
+                  --exclude "*" --include "*.html" --recursive --metadata-directive REPLACE
+                  --acl public-read --cache-control="max-age=0, no-cache, no-store, must-revalidate"
+          artifacts:
+            files:
+              - '**/*'
+            base-directory: dist
+  CodeBuildRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - 'codebuild.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      Path: /service-role/
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:GetObjectVersion'
+                  - 's3:GetBucketVersioning'
+                  - 's3:PutObject'
+                Resource:
+                  - !GetAtt CodePipelineBucket.Arn
+                  - !Join [ '', [ !GetAtt CodePipelineBucket.Arn, '/*' ] ]
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:GetObjectVersion'
+                  - 's3:GetBucketVersioning'
+                  - 's3:ListBucket'
+                  - 's3:PutObject'
+                  - 's3:PutObjectAcl'
+                  - 's3:DeleteObject'
+                  - 's3:DeleteObjectVersion'
+                Resource:
+                  - !GetAtt SiteBucket.Arn
+                  - !Join [ '', [ !GetAtt SiteBucket.Arn, '/*' ] ]
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                  - 'cloudfront:CreateInvalidation'
+                Resource:
+                  - '*'
+  CodePipelineBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !If [ NoPipelineBucket, !Ref 'AWS::NoValue', !Ref PipelineBucket ]
+  CodePipeline:
+    Type: 'AWS::CodePipeline::Pipeline'
+    Properties:
+      ArtifactStore:
+        Location: !Ref CodePipelineBucket
+        Type: S3
+      Name: !Ref PipelineName
+      RoleArn: !GetAtt CodePipelineRole.Arn
+      Stages:
+        - Name: Source
+          Actions:
+            - ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Provider: GitHub
+                Version: '1'
+              Configuration:
+                Branch: !Ref GithubBranch
+                Owner: !Ref GithubOwnerAccount
+                Repo: !Ref GithubRepo
+                OAuthToken: !Ref GithubOAuthToken
+                PollForSourceChanges: false
+              OutputArtifacts:
+                - Name: AppSource
+              Name: SourceAction
+        - Name: Build
+          Actions:
+            - ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: '1'
+                Provider: CodeBuild
+              Configuration:
+                ProjectName: !Ref CodeBuild
+              InputArtifacts:
+                - Name: AppSource
+              OutputArtifacts:
+                - Name: AppBuild
+              Name: BuildAction
+  CodePipelineRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:GetObjectVersion'
+                  - 's3:GetBucketVersioning'
+                  - 's3:PutObject'
+                Resource:
+                  - !GetAtt CodePipelineBucket.Arn
+                  - !Join [ '', [ !GetAtt CodePipelineBucket.Arn, '/*' ] ]
+              - Effect: Allow
+                Action:
+                  - 'codebuild:BatchGetBuilds'
+                  - 'codebuild:StartBuild'
+                Resource: '*'
+  CodePipelineGithubWebhook:
+    Type: 'AWS::CodePipeline::Webhook'
+    Properties:
+      AuthenticationConfiguration:
+        SecretToken: !Ref GithubOAuthToken
+      Filters:
+        - JsonPath: "$.ref"
+          MatchEquals: refs/heads/{Branch}
+      Authentication: GITHUB_HMAC
+      TargetPipeline: !Ref CodePipeline
+      TargetAction: SourceAction
+      Name: !Join [ '-', [ !Ref CodePipeline, 'github-webhook' ] ]
+      TargetPipelineVersion: !GetAtt CodePipeline.Version
+      RegisterWithThirdParty: true
+  CodePipelineExternalWebhook:
+    Type: 'AWS::CodePipeline::Webhook'
+    Properties:
+      Authentication: UNAUTHENTICATED
+      AuthenticationConfiguration: {}
+      Filters:
+        - JsonPath: '$.branch'
+          MatchEquals: '{Branch}'
+      TargetPipeline: !Ref CodePipeline
+      TargetAction: SourceAction
+      Name: !Join [ '-', [ !Ref CodePipeline, 'wp-webhook' ] ]
+      TargetPipelineVersion: !GetAtt CodePipeline.Version
+Outputs:
+  WebsiteBucket:
+    Value: !Ref SiteBucket
+  PipelineBucket:
+    Value: !Ref CodePipelineBucket
+  WordpressWebhookUrl:
+    Value: !GetAtt CodePipelineExternalWebhook.Url
