@@ -24,6 +24,7 @@ Metadata:
         - PHPVersion
         - PHPIniOverride
         - EC2KeyName
+        - LatestAmiId
         - WebInstanceType
         - WebAsgMax
         - WebAsgMin
@@ -70,6 +71,8 @@ Metadata:
         default: EFS File System
       EC2KeyName:
         default: Existing Key Pair
+      LatestAmiId:
+        default: Latest AMI Id
       NumberOfSubnets:
         default: Number of subnets
       PHPVersion:
@@ -140,6 +143,10 @@ Parameters:
     ConstraintDescription: Must be letters (upper or lower), numbers, and special characters.
     Description: Name of an EC2 KeyPair. Your bastion & Web instances will launch with this KeyPair.
     Type: AWS::EC2::KeyPair::KeyName
+  LatestAmiId:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: /aws/service/ami-amazon-linux-latest/amzn-ami-hvm-x86_64-gp2
+    Description: Specifies the AMI to use. Defaults to 64-bit Amazon Linux 1 (don't use 2)
   NumberOfSubnets:
     AllowedValues:
     - 2
@@ -318,9 +325,9 @@ Parameters:
     Description: '[ Optional ] The main domain name of the WordPress site (e.g. example.com). Leave empty to use the ALB DNS name for the WordPress site.'
     Type: String
   WPLocale:
-    Description: The main language of the WordPress site, as per https://codex.WordPress.org/Installing_WordPress_in_Your_Language. The default is 'en_GB'.
+    Description: The main language of the WordPress site, as per https://codex.WordPress.org/Installing_WordPress_in_Your_Language. The default is 'en_US'.
     Type: String
-    Default: en_GB
+    Default: en_US
   WPTitle:
     AllowedPattern: ^([a-zA-Z0-9])([a-zA-Z0-9 _-]*)([a-zA-Z0-9])$
     Description: The WordPress website title.
@@ -458,7 +465,7 @@ Resources:
   WebAutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
-      Cooldown: 60
+      Cooldown: '60'
       HealthCheckGracePeriod: 120
       HealthCheckType: ELB
       LaunchConfigurationName:
@@ -530,6 +537,8 @@ Resources:
               mysql56: []
               php55: []
               php55-mysqlnd: []
+              php55-pecl-imagick: []
+              php55-pecl-memcache: []
           files:
             /tmp/create_site_conf.sh:
               content:
@@ -694,7 +703,7 @@ Resources:
                 ensureRunning: true
     Properties:
       IamInstanceProfile: !Ref WebInstanceProfile
-      ImageId: !FindInMap [ RegionMap, !Ref 'AWS::Region', AMI ]
+      ImageId: !Ref LatestAmiId
       InstanceMonitoring: true
       InstanceType: !Ref WebInstanceType
       KeyName: !Ref EC2KeyName
@@ -734,6 +743,8 @@ Resources:
               mysql56: []
               php56: []
               php56-mysqlnd: []
+              php56-pecl-imagick: []
+              php56-pecl-memcache: []
           files:
             /tmp/create_site_conf.sh:
               content:
@@ -898,7 +909,7 @@ Resources:
                 ensureRunning: true
     Properties:
       IamInstanceProfile: !Ref WebInstanceProfile
-      ImageId: !FindInMap [ RegionMap, !Ref 'AWS::Region', AMI ]
+      ImageId: !Ref LatestAmiId
       InstanceMonitoring: true
       InstanceType: !Ref WebInstanceType
       KeyName: !Ref EC2KeyName
@@ -923,11 +934,13 @@ Resources:
             - install_webserver
             - build_cacheclient
             - build_wordpress
+            - build_wordpress_plugins
             - build_opcache
             - download_aws_ini
             - install_aws_ini
             - install_cacheclient
             - install_wordpress
+            - install_wordpress_plugins
             - install_opcache
             - start_webserver
         install_webserver:
@@ -938,6 +951,8 @@ Resources:
               mysql56: []
               php70: []
               php70-mysqlnd: []
+              php70-pecl-imagick: []
+              php70-pecl-memcache: []
           files:
             /tmp/create_site_conf.sh:
               content:
@@ -1056,6 +1071,62 @@ Resources:
               mode: 000500
               owner: root
               group: root
+        build_wordpress_plugins:
+          files:
+            /tmp/install_wordpress_plugins.sh:
+              content:
+                !Sub |
+                  #!/bin/bash -xe
+                  cd /var/www/wordpress/${WPDirectory}
+
+                  # install w3-total-cache plugin
+                  if ! $(wp plugin is-installed w3-total-cache --allow-root); then
+                      wp plugin install w3-total-cache --activate --allow-root
+                  fi
+
+
+                  # install acf pro plugin if supplied
+                  WPACFProKey=b3JkZXJfaWQ9MTQzMzA2fHR5cGU9ZGV2ZWxvcGVyfGRhdGU9MjAxOC0xMC0yNiAxNjo1ODo0OQ==
+                  if [ !z "$WPACFProKey" ]; then
+                    if ! $(wp plugin is-installed advanced-custom-fields-pro --allow-root); then
+                        # zip file location
+                        acf_zip_file="$(wp plugin path --allow-root)/acf-pro.zip"
+
+                        # get acf pro zip file
+                        wget -O $acf_zip_file "http://connect.advancedcustomfields.com/index.php?p=pro&a=download&k=$WPACFProKey"
+
+                        # install & activate acf pro
+                        wp plugin install $acf_zip_file --activate --allow-root
+
+                        # remove zip file
+                        rm $acf_zip_file
+                    fi
+                  elif ! $(wp plugin is-installed advanced-custom-fields --allow-root); then
+                    wp plugin install advanced-custom-fields --activate --allow-root
+                  fi
+
+                  # install media cloud plugin
+                  if ! $(wp plugin is-installed ilab-media-tools --allow-root); then
+                      wp plugin install ilab-media-tools --activate --allow-root
+                  fi
+
+                  # install acf to rest api plugin
+                  if ! $(wp plugin is-installed acf-to-rest-api --allow-root); then
+                      wp plugin install acf-to-rest-api --activate --allow-root
+                  fi
+
+                  # install wp api menus plugin
+                  if ! $(wp plugin is-installed wp-api-menus --allow-root); then
+                      wp plugin install wp-api-menus --activate --allow-root
+                  fi
+
+                  # install notification plugin
+                  if ! $(wp plugin is-installed notification --allow-root); then
+                      wp plugin install notification --activate --allow-root
+                  fi
+              mode: 000500
+              owner: root
+              group: root
         download_aws_ini:
           files:
             /tmp/download_aws_ini.sh:
@@ -1082,6 +1153,12 @@ Resources:
               command: ./install_wordpress.sh
               cwd: /tmp
               ignoreErrors: false
+        install_wordpress_plugins:
+          commands:
+            install_wordpress_plugins:
+              command: ./install_wordpress_plugins.sh
+              cwd: /tmp
+              ignoreErrors: false
         install_cacheclient:
           commands:
             install_cacheclient:
@@ -1102,7 +1179,7 @@ Resources:
                 ensureRunning: true
     Properties:
       IamInstanceProfile: !Ref WebInstanceProfile
-      ImageId: !FindInMap [ RegionMap, !Ref 'AWS::Region', AMI ]
+      ImageId: !Ref LatestAmiId
       InstanceMonitoring: true
       InstanceType: !Ref WebInstanceType
       KeyName: !Ref EC2KeyName
