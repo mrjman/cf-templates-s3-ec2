@@ -18,21 +18,21 @@ Metadata:
 
   AWS::CloudFormation::Interface:
     ParameterGroups:
-    - Label:
-        default: Database Parameters
-      Parameters:
-        - AllocatedStorage
-        - BackupRetentionPeriod
-        - DatabaseInstanceType
-        - DatabaseMasterUsername
-        - DatabaseMasterPassword
-        - DatabaseName
-        - DatabaseEncrpytedBoolean
-        - DatabaseCmk
-        - DatabaseSecurityGroup
-        - MultiAZ
-        - NumberOfSubnets
-        - Subnet
+      - Label:
+          default: Database Parameters
+        Parameters:
+          - AllocatedStorage
+          - BackupRetentionPeriod
+          - DatabaseInstanceType
+          - DatabaseMasterUsername
+          - DatabaseMasterPassword
+          - DatabaseName
+          - DatabaseEncrpytedBoolean
+          - DatabaseCmk
+          - DatabaseSecurityGroup
+          - MultiAZ
+          - NumberOfSubnets
+          - Subnet
     ParameterLabels:
       AllocatedStorage:
         default: Allocated Storage
@@ -151,11 +151,11 @@ Parameters:
     Type: String
   NumberOfSubnets:
     AllowedValues:
-    - 2
-    - 3
-    - 4
-    - 5
-    - 6
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
     Default: 3
     Description: Number of subnets. This must match your selections in the list of subnets below.
     Type: String

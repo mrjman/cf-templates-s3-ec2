@@ -1,0 +1,105 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: Creates S3 bucket
+
+Metadata:
+  Author: Mondo Robot
+
+  AWS::CloudFormation::Interface:
+    ParameterLabels:
+      AccessControl:
+        default: Access Control
+      BucketName:
+        default: Bucket Name
+      Environment:
+        default: Environment
+
+Parameters:
+  AccessControl:
+    AllowedValues:
+      - AuthenticatedRead
+      - AwsExecRead
+      - BucketOwnerRead
+      - BucketOwnerFullControl
+      - LogDeliveryWrite
+      - Private
+      - PublicRead
+      - PublicReadWrite
+      - NONE
+    Default: NONE
+    Description: Optional access control for bucket
+    Type: String
+  BucketName:
+    Description: The name for the bucket
+    Type: String
+  Environment:
+    AllowedValues: [develop, staging, production]
+    Default: develop
+    Description: The development environment
+    Type: String
+
+Conditions:
+  HasAccessControl: !Not [ !Equals [ NONE, !Ref AccessControl ] ]
+  HasBucketName: !Not [ !Equals [ '', !Ref BucketName ] ]
+
+Resources:
+  Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: !If [ HasAccessControl, !Ref AccessControl, !Ref 'AWS::NoValue' ]
+      BucketName: !If [ HasBucketName, !Ref BucketName, !Ref 'AWS::NoValue' ]
+  IamUser:
+    Type: AWS::IAM::User
+    Properties:
+      Policies:
+        - PolicyName: !Sub media-upload-${Bucket}
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Action:
+                  - s3:DeleteObjectTagging
+                  - s3:ListBucketMultipartUploads
+                  - s3:DeleteObjectVersion
+                  - s3:ListBucket
+                  - s3:DeleteObjectVersionTagging
+                  - s3:GetBucketAcl
+                  - s3:ListMultipartUploadParts
+                  - s3:PutObject
+                  - s3:GetObjectAcl
+                  - s3:GetObject
+                  - s3:AbortMultipartUpload
+                  - s3:DeleteObject
+                  - s3:GetBucketLocation
+                  - s3:PutObjectAcl
+                Effect: Allow
+                Resource:
+                  - !GetAtt Bucket.Arn
+                  - !Sub '${Bucket.Arn}/*'
+              - Action:
+                  - s3:HeadBucket
+                Effect: Allow
+                Resource: '*'
+      UserName: !Sub 'media-upload-${Environment}-${AWS::Region}'
+  IamAccessKey:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName: !Ref IamUser
+
+Outputs:
+  AccessKeyId:
+    Value: !Ref IamAccessKey
+  AccessKeySecret:
+    Value: !GetAtt IamAccessKey.SecretAccessKey
+  Arn:
+    Value: !GetAtt Bucket.Arn
+  DomainName:
+    Value: !GetAtt Bucket.DomainName
+  IamUser:
+    Value: !Ref IamUser
+  Name:
+    Value: !Ref Bucket
+    Export:
+      Name: !Sub ${AWS::StackName}-Name
+  StackName:
+    Value: !Ref 'AWS::StackName'

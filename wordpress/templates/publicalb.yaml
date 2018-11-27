@@ -65,49 +65,14 @@ Parameters:
     Type: AWS::EC2::VPC::Id
 
 Conditions:
-
-  SslCertificate:
-    !Not [!Equals [ '', !Ref PublicAlbAcmCertificate ] ]
-  NoSslCertificate:
-    !Equals [ '', !Ref PublicAlbAcmCertificate ]
-  NumberOfSubnets1:
-      !Equals [ 1, !Ref NumberOfSubnets ]
-  NumberOfSubnets2:
-      !Equals [ 2, !Ref NumberOfSubnets ]
-  NumberOfSubnets3:
-      !Equals [ 3, !Ref NumberOfSubnets ]
-  NumberOfSubnets4:
-      !Equals [ 4, !Ref NumberOfSubnets ]
-  NumberOfSubnets5:
-      !Equals [ 5, !Ref NumberOfSubnets ]
-  NumberOfSubnets6:
-      !Equals [ 6, !Ref NumberOfSubnets ]
-  Subnet0: !Or
-    - !Condition NumberOfSubnets1
-    - !Condition NumberOfSubnets2
-    - !Condition NumberOfSubnets3
-    - !Condition NumberOfSubnets4
-    - !Condition NumberOfSubnets5
-    - !Condition NumberOfSubnets6
-  Subnet1: !Or
-    - !Condition NumberOfSubnets2
-    - !Condition NumberOfSubnets3
-    - !Condition NumberOfSubnets4
-    - !Condition NumberOfSubnets5
-    - !Condition NumberOfSubnets6
-  Subnet2: !Or
-    - !Condition NumberOfSubnets3
-    - !Condition NumberOfSubnets4
-    - !Condition NumberOfSubnets5
-    - !Condition NumberOfSubnets6
-  Subnet3: !Or
-    - !Condition NumberOfSubnets4
-    - !Condition NumberOfSubnets5
-    - !Condition NumberOfSubnets6
-  Subnet4: !Or
-    - !Condition NumberOfSubnets5
-    - !Condition NumberOfSubnets6
-  Subnet5: !Condition NumberOfSubnets6
+  SslCertificate: !Not [ !Equals [ '', !Ref PublicAlbAcmCertificate ] ]
+  NoSslCertificate: !Equals [ '', !Ref PublicAlbAcmCertificate ]
+  NumberOfSubnets1: !Equals [ 1, !Ref NumberOfSubnets ]
+  NumberOfSubnets2: !Equals [ 2, !Ref NumberOfSubnets ]
+  NumberOfSubnets3: !Equals [ 3, !Ref NumberOfSubnets ]
+  NumberOfSubnets4: !Equals [ 4, !Ref NumberOfSubnets ]
+  NumberOfSubnets5: !Equals [ 5, !Ref NumberOfSubnets ]
+  NumberOfSubnets6: !Equals [ 6, !Ref NumberOfSubnets ]
 
 Resources:
 
@@ -115,8 +80,8 @@ Resources:
     Type : AWS::ElasticLoadBalancingV2::Listener
     Properties:
       DefaultActions:
-      - Type: forward
-        TargetGroupArn: !Ref PublicAlbTargetGroup
+        - Type: forward
+          TargetGroupArn: !Ref PublicAlbTargetGroup
       LoadBalancerArn: !Ref PublicApplicationLoadBalancer
       Port: 80
       Protocol: HTTP
@@ -125,10 +90,10 @@ Resources:
     Type : AWS::ElasticLoadBalancingV2::Listener
     Properties:
       Certificates:
-      - CertificateArn: !Ref PublicAlbAcmCertificate
+        - CertificateArn: !Ref PublicAlbAcmCertificate
       DefaultActions:
-      - Type: forward
-        TargetGroupArn: !Ref PublicAlbTargetGroup
+        - Type: forward
+          TargetGroupArn: !Ref PublicAlbTargetGroup
       LoadBalancerArn: !Ref PublicApplicationLoadBalancer
       Port: 443
       Protocol: HTTPS
@@ -159,13 +124,13 @@ Resources:
             ]
           ]
       LoadBalancerAttributes:
-      - Key: idle_timeout.timeout_seconds
-        Value: 60
+        - Key: idle_timeout.timeout_seconds
+          Value: '60'
       SecurityGroups:
-      - !Ref PublicAlbSecurityGroup
+        - !Ref PublicAlbSecurityGroup
       Tags:
-      - Key: Name
-        Value: !Join [ '', [ 'Public ALB / ', !Ref 'AWS::StackName' ] ]
+        - Key: Name
+          Value: !Join [ '', [ 'Public ALB / ', !Ref 'AWS::StackName' ] ]
   PublicAlbTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
@@ -175,8 +140,8 @@ Resources:
       Port: 80
       Protocol: HTTP
       Tags:
-      - Key: Name
-        Value: !Join [ '', [ 'Public ALB / ', !Ref 'AWS::StackName' ] ]
+        - Key: Name
+          Value: !Join [ '', [ 'Public ALB / ', !Ref 'AWS::StackName' ] ]
       UnhealthyThresholdCount: 5
       VpcId: !Ref Vpc
 
