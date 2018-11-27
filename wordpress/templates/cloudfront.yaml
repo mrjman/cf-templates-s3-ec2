@@ -52,7 +52,7 @@ Parameters:
 
 Conditions:
   HasDomain: !Not [ !Equals [ '', !Ref WPDomainName ] ]
-  HasMediaBucket: !Not [ !Equals [ '', !Ref S3S3MediaBucketOrigin ] ]
+  HasMediaBucket: !Not [ !Equals [ '', !Ref S3MediaBucketOrigin ] ]
   UseDefaultCert: !Equals [ '', !Ref CloudFrontAcmCertificate ]
 
 Resources:
