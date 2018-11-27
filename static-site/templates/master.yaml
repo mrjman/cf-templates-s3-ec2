@@ -3,22 +3,60 @@ AWSTemplateFormatVersion: 2010-09-09
 Metadata:
   Author: Mondo Robot
 
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Github
+        Parameters:
+          - GithubOwnerAccount
+          - GithubOAuthToken
+          - GithubRepo
+          - GithubBranch
+      - Label:
+          default: Website
+        Parameters:
+          - Domain
+          - SiteBucketName
+          - IndexDocument
+          - ErrorDocumentPath
+          - CertificateArn
+          - PriceClass
+      - Label:
+          default: CodePipeline/CodeBuild
+        Parameters:
+          - PipelineBucket
+          - PipelineName
+          - BuildType
+          - BuildComputeType
+          - BuildImage
+          - ApiBaseUrl
+          - ApiMenuUrl
+          - ApiNavMenuUrl
+          - ApiMediaUrl
+          - ApiArtistsUrl
+          - CdnUrl
+      - Label:
+          default: Lambda@Edge Parameters
+        Parameters:
+          - LambdaFunctionDescription
+          - LambdaLogsRetentionInDays
+
 Parameters:
   ApiBaseUrl:
     Description: Base api url
-    Default: 'http://ec2-54-71-48-148.us-west-2.compute.amazonaws.com/index.php/wp-json/wp/v2'
+    Default: 'http://coach-Publi-19PDRRQWNG4UK-713229067.us-east-1.elb.amazonaws.com/wp-json/wp/v2'
     Type: String
   ApiMenuUrl:
     Description: Menu api url
-    Default: 'http://ec2-54-71-48-148.us-west-2.compute.amazonaws.com/index.php/wp-json/wp-api-menus/v2/menus'
+    Default: 'http://coach-Publi-19PDRRQWNG4UK-713229067.us-east-1.elb.amazonaws.com/wp-json/wp-api-menus/v2/menus'
     Type: String
   ApiNavMenuUrl:
     Description: Main nav api url
-    Default: 'http://ec2-54-71-48-148.us-west-2.compute.amazonaws.com/index.php/wp-json/wp-api-menus/v2/menu-locations'
+    Default: 'http://coach-Publi-19PDRRQWNG4UK-713229067.us-east-1.elb.amazonaws.com/wp-json/wp-api-menus/v2/menu-locations'
     Type: String
   ApiMediaUrl:
     Description: Media url
-    Default: 'http://ec2-54-71-48-148.us-west-2.compute.amazonaws.com/wp-content/uploads'
+    Default: 'http://coach-Publi-19PDRRQWNG4UK-713229067.us-east-1.elb.amazonaws.com/wp-content/uploads'
     Type: String
   ApiArtistsUrl:
     Description: Arists data url
@@ -29,16 +67,37 @@ Parameters:
     Default: 'aws/codebuild/nodejs:10.1.0'
     Type: String
   BuildComputeType:
+    AllowedValues:
+      - BUILD_GENERAL1_SMALL
+      - BUILD_GENERAL1_MEDIUM
+      - BUILD_GENERAL1_LARGE
     Description: Build machine compute type
     Default: BUILD_GENERAL1_SMALL
     Type: String
   BuildType:
+    AllowedValues:
+      - LINUX_CONTAINER
+      - WINDOWS_CONTAINER
     Description: Build machine type
     Default: LINUX_CONTAINER
     Type: String
+  CertificateArn:
+    Description: The ACM certificate to use
+    Type: String
   CdnUrl:
-    Description: CDN url
+    Description: CDN url for public assets
     Default: 'https://d1xidugad9lo1d.cloudfront.net'
+    Type: String
+  Domain:
+    Description: The domain for the website
+    Type: String
+  ErrorDocumentPath:
+    Description: The error document
+    Default: /404.html
+    Type: String
+  IndexDocument:
+    Description: The root document of directory
+    Default: index.html
     Type: String
   GithubOwnerAccount:
     Description: Github owner account. Can be found in github url /<owner>/<repo>
@@ -53,8 +112,17 @@ Parameters:
     NoEcho: true
     Type: String
   GithubRepo:
-    Description: Githut repo name
+    Default: coa.website
+    Description: Githut repo name. Can be found in github url /<owner>/<repo>
     Type: String
+  LambdaFunctionDescription:
+    Description: The description for the lambda FunctionName
+    Type: String
+  LambdaLogsRetentionInDays:
+    Description: 'Specifies the number of days you want to retain log events in the specified log group.'
+    Type: Number
+    Default: 14
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653]
   PipelineBucket:
     Description: The bucket name to store pipeline artifacts
     Default: ''
@@ -63,21 +131,67 @@ Parameters:
     Description: The name of the code pipeline
     Default: coachella-static-pipeline
     Type: String
+  PriceClass:
+    AllowedValues:
+      - PriceClass_100
+      - PriceClass_200
+      - PriceClass_All
+    Description: The price class that corresponds to which edge servers are used.
+    Default: PriceClass_All
+    Type: String
   SiteBucketName:
     Description: The name to use when generating the S3 bucket for the static site
     Default: coachella-static
     Type: String
 
 Conditions:
+  HasDomain: !Not [ !Equals [ '', !Ref Domain ] ]
   NoPipelineBucket: !Equals [ '', !Ref PipelineBucket ]
   NoSiteBucketName: !Equals [ '', !Ref SiteBucketName ]
+  UseDefaultCert: !Equals [ '', !Ref CertificateArn ]
 
 Resources:
-  SiteBucket:
-    Type: 'AWS::S3::Bucket'
+  CloudFrontDistribution:
+    Type: 'AWS::CloudFront::Distribution'
     Properties:
-      BucketName: !If [ NoSiteBucketName, !Ref 'AWS::NoValue', !Ref SiteBucketName ]
-
+      DistributionConfig:
+        Aliases:
+          - !If [ HasDomain, !Ref Domain, !Ref 'AWS::NoValue' ]
+        ViewerCertificate:
+          AcmCertificateArn: !If [ UseDefaultCert, !Ref 'AWS::NoValue', !Ref CertificateArn ]
+          CloudFrontDefaultCertificate: !If [ UseDefaultCert, true, !Ref 'AWS::NoValue' ]
+          SslSupportMethod: !If [ UseDefaultCert, !Ref 'AWS::NoValue', 'sni-only' ]
+        CustomErrorResponses:
+          - ErrorCode: 403 # not found
+            ResponseCode: 404
+            ResponsePagePath: !Ref ErrorDocumentPath
+        DefaultCacheBehavior:
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD, OPTIONS]
+          Compress: true
+          ForwardedValues:
+            Cookies:
+              Forward: none
+            QueryString: false
+          LambdaFunctionAssociations:
+            - EventType: 'origin-request'
+              LambdaFunctionARN: !GetAtt Lambda.Outputs.VersionArn
+          MinTTL: 0
+          TargetOriginId: s3origin
+          ViewerProtocolPolicy: !If [ UseDefaultCert, 'allow-all', 'redirect-to-https']
+        Enabled: true
+        HttpVersion: http2
+        Origins:
+          - DomainName: !Sub ${S3SiteBucket.DomainName}
+            Id: s3origin
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}'
+        PriceClass: !Ref PriceClass
+  CloudFrontOriginAccessIdentity:
+    Type: 'AWS::CloudFront::CloudFrontOriginAccessIdentity'
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: !Sub CloudFront OAI for ${S3SiteBucket}
   CodeBuild:
     Type: 'AWS::CodeBuild::Project'
     Properties:
@@ -124,17 +238,17 @@ Resources:
             post_build:
               commands:
                 # sync contents to S3
-                - aws s3 sync --delete dist/ s3://${SiteBucket}/
+                - aws s3 sync --delete dist/ s3://${S3SiteBucket}/
                 # set cache-control headers for non html files
                 - >
-                  aws s3 cp s3://${SiteBucket}/ s3://${SiteBucket}/
+                  aws s3 cp s3://${S3SiteBucket}/ s3://${S3SiteBucket}/
                   --exclude "*.html" --recursive --metadata-directive REPLACE
-                  --acl public-read --cache-control="max-age=31536000, public"
+                  --cache-control="max-age=31536000, public"
                 # set cache-control headers for html files
                 - >
-                  aws s3 cp s3://${SiteBucket}/ s3://${SiteBucket}/
+                  aws s3 cp s3://${S3SiteBucket}/ s3://${S3SiteBucket}/
                   --exclude "*" --include "*.html" --recursive --metadata-directive REPLACE
-                  --acl public-read --cache-control="max-age=0, no-cache, no-store, must-revalidate"
+                  --cache-control="max-age=0, no-cache, no-store, must-revalidate"
           artifacts:
             files:
               - '**/*'
@@ -177,8 +291,8 @@ Resources:
                   - 's3:DeleteObject'
                   - 's3:DeleteObjectVersion'
                 Resource:
-                  - !GetAtt SiteBucket.Arn
-                  - !Join [ '', [ !GetAtt SiteBucket.Arn, '/*' ] ]
+                  - !GetAtt S3SiteBucket.Arn
+                  - !Join [ '', [ !GetAtt S3SiteBucket.Arn, '/*' ] ]
               - Effect: Allow
                 Action:
                   - 'logs:CreateLogGroup'
@@ -287,10 +401,47 @@ Resources:
       TargetAction: SourceAction
       Name: !Join [ '-', [ !Ref CodePipeline, 'wp-webhook' ] ]
       TargetPipelineVersion: !GetAtt CodePipeline.Version
+  Lambda:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        FunctionDescription: !Ref LambdaFunctionDescription
+        IndexDocument: !Ref IndexDocument
+        LogsRetentionInDays: !Ref LambdaLogsRetentionInDays
+      TemplateURL: https://s3.amazonaws.com/cf-coachella/static-site/lambda-edge-urls.yaml
+  S3SiteBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      BucketName: !If [ NoSiteBucketName, !Ref 'AWS::NoValue', !Ref SiteBucketName ]
+  S3SiteBucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      Bucket: !Ref S3SiteBucket
+      PolicyDocument:
+        Statement:
+          - Action: 's3:GetObject'
+            Effect: Allow
+            Resource: !Sub 'arn:aws:s3:::${S3SiteBucket}/*'
+            Principal:
+              CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
+
 Outputs:
+  WebsiteUrl:
+    Description: Static website url
+    Value: !If [ HasDomain, !Sub 'https://${Domain}', !Sub 'https://${CloudFrontDistribution.DomainName}' ]
   WebsiteBucket:
-    Value: !Ref SiteBucket
+    Description: The bucket holding the static website
+    Value: !Ref S3SiteBucket
   PipelineBucket:
+    Description: The bucket holding the code pipeline artifacts
     Value: !Ref CodePipelineBucket
+  DistributionId:
+    Description: CloudFront Distribution Id
+    Value: !Ref CloudFrontDistribution
   WordpressWebhookUrl:
+    Description: Webhook URL for pushing change notifications from wordpress
     Value: !GetAtt CodePipelineExternalWebhook.Url
