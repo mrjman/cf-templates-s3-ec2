@@ -34,7 +34,7 @@ Metadata:
           - ApiNavMenuUrl
           - ApiMediaUrl
           - ApiArtistsUrl
-          - CdnUrl
+          - ApiArtistMediaUrl
       - Label:
           default: Lambda@Edge Parameters
         Parameters:
@@ -42,25 +42,25 @@ Metadata:
           - LambdaLogsRetentionInDays
 
 Parameters:
-  ApiBaseUrl:
-    Description: Base api url
-    Default: 'http://coach-Publi-19PDRRQWNG4UK-713229067.us-east-1.elb.amazonaws.com/wp-json/wp/v2'
-    Type: String
-  ApiMenuUrl:
-    Description: Menu api url
-    Default: 'http://coach-Publi-19PDRRQWNG4UK-713229067.us-east-1.elb.amazonaws.com/wp-json/wp-api-menus/v2/menus'
-    Type: String
-  ApiNavMenuUrl:
-    Description: Main nav api url
-    Default: 'http://coach-Publi-19PDRRQWNG4UK-713229067.us-east-1.elb.amazonaws.com/wp-json/wp-api-menus/v2/menu-locations'
-    Type: String
-  ApiMediaUrl:
-    Description: Media url
-    Default: 'http://coach-Publi-19PDRRQWNG4UK-713229067.us-east-1.elb.amazonaws.com/wp-content/uploads'
-    Type: String
   ApiArtistsUrl:
     Description: Arists data url
     Default: 'https://s3.amazonaws.com/goeventweb-static.greencopper.com/8b22db9b97ce4d4b864a42f401f87e73/coachella-2018/data/eng/artists.json'
+    Type: String
+  ApiArtistMediaUrl:
+    Description: Arists data url
+    Default: 'https://goevent-images.s3.amazonaws.com/coachella-2018/1958aa84/web'
+    Type: String
+  ApiBaseUrl:
+    Description: Base api url
+    Type: String
+  ApiMenuUrl:
+    Description: Menu api url
+    Type: String
+  ApiNavMenuUrl:
+    Description: Main nav api url
+    Type: String
+  ApiMediaUrl:
+    Description: Media url
     Type: String
   BuildImage:
     Description: Build machine image
@@ -83,10 +83,6 @@ Parameters:
     Type: String
   CertificateArn:
     Description: The ACM certificate to use
-    Type: String
-  CdnUrl:
-    Description: CDN url for public assets
-    Default: 'https://d1xidugad9lo1d.cloudfront.net'
     Type: String
   Domain:
     Description: The domain for the website
@@ -212,11 +208,11 @@ Resources:
           - Name: NUXT_ENV_API_MEDIA_URL
             Value: !Ref ApiMediaUrl
             Type: PLAINTEXT
-          - Name: NUXT_ENV_CDN_URL
-            Value: !Ref CdnUrl
-            Type: PLAINTEXT
           - Name: NUXT_ENV_GC_ARTISTS
             Value: !Ref ApiArtistsUrl
+            Type: PLAINTEXT
+          - Name: NUXT_ENV_GC_IMAGES
+            Value: !Ref ApiArtistMediaUrl
             Type: PLAINTEXT
         Image: !Ref BuildImage
         Type: !Ref BuildType
