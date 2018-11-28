@@ -112,6 +112,7 @@ Parameters:
     Description: Githut repo name. Can be found in github url /<owner>/<repo>
     Type: String
   LambdaFunctionDescription:
+    Default: Enables clean urls
     Description: The description for the lambda FunctionName
     Type: String
   LambdaLogsRetentionInDays:
