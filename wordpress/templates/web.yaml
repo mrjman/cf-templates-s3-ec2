@@ -18,48 +18,55 @@ Metadata:
 
   AWS::CloudFormation::Interface:
     ParameterGroups:
-    - Label:
-        default: Web Parameters
-      Parameters:
-        - PHPVersion
-        - PHPIniOverride
-        - EC2KeyName
-        - LatestAmiId
-        - WebInstanceType
-        - WebAsgMax
-        - WebAsgMin
-        - WebSecurityGroup
-        - NumberOfSubnets
-        - Subnet
-        - PublicAlbTargetGroupArn
-        - PublicAlbHostname
-        - SslCertificate
-    - Label:
-        default: WordPress Parameters
-      Parameters:
-        - WPVersion
-        - WPTitle
-        - WPDomainName
-        - WPDirectory
-        - WPAdminUsername
-        - WPAdminPassword
-        - WPAdminEmail
-        - WPLocale
-        - WPACFProKey
-    - Label:
-        default: Database Parameters
-      Parameters:
-        - DatabaseClusterEndpointAddress
-        - DatabaseName
-        - DatabaseMasterUsername
-        - DatabaseMasterPassword
-    - Label:
-        default: File System Parameters
-      Parameters:
-        - ElasticFileSystem
+      - Label:
+          default: Web Parameters
+        Parameters:
+          - PHPVersion
+          - PHPIniOverride
+          - EC2KeyName
+          - LatestAmiId
+          - WebInstanceType
+          - WebAsgMax
+          - WebAsgMin
+          - WebSecurityGroup
+          - NumberOfSubnets
+          - Subnet
+          - PublicAlbTargetGroupArn
+          - PublicAlbHostname
+          - SslCertificate
+      - Label:
+          default: WordPress Parameters
+        Parameters:
+          - WPVersion
+          - WPTitle
+          - WPDomainName
+          - WPDirectory
+          - WPAdminUsername
+          - WPAdminPassword
+          - WPAdminEmail
+          - WPLocale
+          - WPACFProKey
+      - Label:
+          default: Database Parameters
+        Parameters:
+          - DatabaseClusterEndpointAddress
+          - DatabaseName
+          - DatabaseMasterUsername
+          - DatabaseMasterPassword
+      - Label:
+          default: Media Parameters
+        Parameters:
+          - MediaUploadBucket
+          - MediaUploadAccessKeyId
+          - MediaUploadAccessKeySecret
+          - CdnUrl
+      - Label:
+          default: File System Parameters
+        Parameters:
+          - ElasticFileSystem
     ParameterLabels:
-      PHPIniOverride:
-        default: AWS php.ini Overrides
+      CdnUrl:
+        default: CDN URL
       DatabaseClusterEndpointAddress:
         default: DB Cluster Endpoint Address
       DatabaseMasterUsername:
@@ -74,8 +81,16 @@ Metadata:
         default: Existing Key Pair
       LatestAmiId:
         default: Latest AMI Id
+      MediaUploadAccessKeyId:
+        default: Media Upload Access Key Id
+      MediaUploadAccessKeySecret:
+        default: Media Upload Access Key Secret
+      MediaUploadBucket:
+        default: Media Upload S3 Bucket
       NumberOfSubnets:
         default: Number of subnets
+      PHPIniOverride:
+        default: AWS php.ini Overrides
       PHPVersion:
         default: PHP Version
       PublicAlbTargetGroupArn:
@@ -114,7 +129,10 @@ Metadata:
         default: WordPress Version
 
 Parameters:
-
+  CdnUrl:
+    Default: ''
+    Description: '[Optional] Url for CDN assets hosting'
+    Type: String
   DatabaseClusterEndpointAddress:
     Description: The RDS cluster endpoint address.
     Type: String
@@ -138,6 +156,7 @@ Parameters:
     Description: The Amazon RDS master database name.
     Type: String
   ElasticFileSystem:
+    Default: ''
     Description: The Amazon EFS file system id.
     Type: String
   EC2KeyName:
@@ -146,16 +165,21 @@ Parameters:
     Description: Name of an EC2 KeyPair. Your bastion & Web instances will launch with this KeyPair.
     Type: AWS::EC2::KeyPair::KeyName
   LatestAmiId:
-    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
     Default: /aws/service/ami-amazon-linux-latest/amzn-ami-hvm-x86_64-gp2
     Description: Specifies the AMI to use. Defaults to 64-bit Amazon Linux 1 (don't use 2)
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+  MediaUploadAccessKeyId:
+    Description: Access Key Id of the user account that allows media uploads from wordpress
+    Type: String
+  MediaUploadAccessKeySecret:
+    Description: Access Key Secret of the user account that allows media uploads from wordpress
+    NoEcho: true
+    Type: String
+  MediaUploadBucket:
+    Description: The s3 bucket where media assets are uploaded
+    Type: String
   NumberOfSubnets:
-    AllowedValues:
-    - 2
-    - 3
-    - 4
-    - 5
-    - 6
+    AllowedValues: [2, 3, 4, 5, 6]
     Default: 3
     Description: Number of subnets. This must match your selections in the list of subnets below.
     Type: String
@@ -163,10 +187,7 @@ Parameters:
     Description: Full Amazon S3 https path to a php.ini override file (e.g. https://s3.amazonaws.com/aws-refarch/wordpress/latest/bits/20-aws.ini)
     Type: String
   PHPVersion:
-    AllowedValues:
-    - 5.5
-    - 5.6
-    - 7.0
+    AllowedValues: [5.5, 5.6, 7.0]
     Default: 7.0
     Description: The version of PHP to install.
     Type: String
@@ -177,9 +198,7 @@ Parameters:
     Description: The hostname of the public ALB http form (e.g. http://abdc-12345-xyz.<region>.elb.amazonaws.com)
     Type: String
   SslCertificate:
-    AllowedValues:
-      - True
-      - False
+    AllowedValues: [true, false]
     Default: False
     Description: Is there an ACM SSL Certificate attached to the Public Alb?
     Type:
@@ -190,13 +209,13 @@ Parameters:
   WebAsgMax:
     AllowedPattern: ^((?!0$)[1-2]?[0-9]|30)$
     ConstraintDescription: Must be a number between 1 and 30.
-    Default: 4
+    Default: 2
     Description: Specifies the maximum number of EC2 instances in the Web Autoscaling Group.
     Type: String
   WebAsgMin:
     AllowedPattern: ^([0-0]?[0-9]|10)$
     ConstraintDescription: Must be a number between 0 and 10.
-    Default: 2
+    Default: 1
     Description: Specifies the minimum number of EC2 instances in the Web Autoscaling Group.
     Type: String
   WebInstanceType:
@@ -298,13 +317,14 @@ Parameters:
       - p3.8xlarge
       - p3.16xlarge
     ConstraintDescription: Must be a valid Amazon EC2 instance type.
-    Default: t2.large
+    Default: t2.micro
     Description: The Amazon EC2 instance type for your web instances.
     Type: String
   WebSecurityGroup:
     Description: Select the web security group.
     Type: AWS::EC2::SecurityGroup::Id
   WPACFProKey:
+    Default: ''
     Description: Advanced Custom Fields Pro key
     NoEcho: true
     Type: String
@@ -470,12 +490,14 @@ Resources:
             - build_cacheclient
             - build_wordpress
             - build_wordpress_plugins
+            - build_wordpress_initialization
             - build_opcache
             - download_aws_ini
             - install_aws_ini
             - install_cacheclient
             - install_wordpress
             - install_wordpress_plugins
+            - install_wordpress_initialization
             - install_opcache
             - start_webserver
         install_webserver:
@@ -587,9 +609,6 @@ Resources:
                     "       # enable HTTPS in wp-config.php if ACM Public SSL Certificate parameter was not empty\n",
                             !If [ NoSslCertificate, !Join [ '', [ "       sed -i \"/$table_prefix = 'wp_';/ a \\# No ACM Public SSL Certificate \" /var/www/wordpress/", !Ref WPDirectory, "/wp-config.php\n" ] ] , !Join [ '', [ "       sed -i \"/$table_prefix = 'wp_';/ a \\$_SERVER['HTTPS'] = 'on';\" /var/www/wordpress/", !Ref WPDirectory, "/wp-config.php\n" ] ] ],
                     "\n",
-                    "       # set permissions of wordpress site directories\n",
-                    "       chown -R apache:apache /var/www/wordpress/", !Ref WPDirectory, "\n",
-                    "       chmod u+wrx /var/www/wordpress/", !Ref WPDirectory, "/wp-content/*\n",
                     "       if [ ! -f /var/www/wordpress/", !Ref WPDirectory, "/opcache-instanceid.php ]; then\n",
                     "         wget -P /var/www/wordpress/", !Ref WPDirectory, "/ https://s3.amazonaws.com/aws-refarch/wordpress/latest/bits/opcache-instanceid.php\n",
                     "       fi\n",
@@ -616,7 +635,7 @@ Resources:
 
                   # install w3-total-cache plugin
                   if ! $(wp plugin is-installed w3-total-cache --allow-root); then
-                      wp plugin install w3-total-cache --activate --allow-root
+                      wp plugin install w3-total-cache --allow-root
                   fi
 
                   # install acf pro plugin if supplied
@@ -660,6 +679,47 @@ Resources:
               mode: 000500
               owner: root
               group: root
+        build_wordpress_initialization:
+          files:
+            /tmp/install_wordpress_initialization.sh:
+              content:
+                !Sub |
+                  #!/bin/bash -xe
+                  directory="/var/www/wordpress/${WPDirectory}"
+                  cd "$directory"
+
+                  # set wordpress config
+                  wp config set DISALLOW_FILE_EDIT true --raw --type=constant --allow-root
+
+                  # set wordpress permalink structure
+                  wp rewrite structure "/%postname%/" --allow-root
+
+                  # set wordpress options
+                  wp option set blog_public "0" --allow-root
+                  wp option update uploads_use_yearmonth_folders "0" --allow-root
+
+                  # set Media Cloud plugin options
+                  wp option update ilab-media-s3-access-key "${MediaUploadAccessKeyId}" --allow-root
+                  wp option update ilab-media-s3-bucket "${MediaUploadBucket}" --allow-root
+                  wp option update ilab-media-s3-cache-control "public,max-age=2592000" --allow-root
+                  if [ -n "${CdnUrl}" ]; then
+                    wp option update ilab-media-s3-cdn-base "${CdnUrl}" --allow-root
+                  fi
+                  wp option update ilab-media-s3-delete-uploads "on" --allow-root
+                  wp option update ilab-media-s3-display-s3-badge "on" --allow-root
+                  wp option update ilab-media-s3-prefix "uploads" --allow-root
+                  wp option update ilab-media-s3-region "${AWS::Region}" --allow-root
+                  wp option update ilab-media-s3-secret "${MediaUploadAccessKeySecret}" --allow-root
+                  wp option update ilab-media-storage-provider "s3" --allow-root
+                  wp option update ilab-media-tool-enabled-storage "1" --allow-root
+
+                  # set permission of wordpress site directories
+                  chown -R apache:apache "$directory"
+                  find "$directory" -type d -exec chmod 750 {} \;
+                  find "$directory" -type f -exec chmod 640 {} \;
+              mode: 000500
+              owner: root
+              group: root
         download_aws_ini:
           files:
             /tmp/download_aws_ini.sh:
@@ -690,6 +750,12 @@ Resources:
           commands:
             install_wordpress_plugins:
               command: ./install_wordpress_plugins.sh
+              cwd: /tmp
+              ignoreErrors: false
+        install_wordpress_initialization:
+          commands:
+            install_wordpress_initialization:
+              command: ./install_wordpress_initialization.sh
               cwd: /tmp
               ignoreErrors: false
         install_cacheclient:
@@ -742,12 +808,14 @@ Resources:
             - build_cacheclient
             - build_wordpress
             - build_wordpress_plugins
+            - build_wordpress_initialization
             - build_opcache
             - download_aws_ini
             - install_aws_ini
             - install_cacheclient
             - install_wordpress
             - install_wordpress_plugins
+            - install_wordpress_initialization
             - install_opcache
             - start_webserver
         install_webserver:
@@ -859,9 +927,6 @@ Resources:
                     "       # enable HTTPS in wp-config.php if ACM Public SSL Certificate parameter was not empty\n",
                             !If [ NoSslCertificate, !Join [ '', [ "       sed -i \"/$table_prefix = 'wp_';/ a \\# No ACM Public SSL Certificate \" /var/www/wordpress/", !Ref WPDirectory, "/wp-config.php\n" ] ] , !Join [ '', [ "       sed -i \"/$table_prefix = 'wp_';/ a \\$_SERVER['HTTPS'] = 'on';\" /var/www/wordpress/", !Ref WPDirectory, "/wp-config.php\n" ] ] ],
                     "\n",
-                    "       # set permissions of wordpress site directories\n",
-                    "       chown -R apache:apache /var/www/wordpress/", !Ref WPDirectory, "\n",
-                    "       chmod u+wrx /var/www/wordpress/", !Ref WPDirectory, "/wp-content/*\n",
                     "       if [ ! -f /var/www/wordpress/", !Ref WPDirectory, "/opcache-instanceid.php ]; then\n",
                     "         wget -P /var/www/wordpress/", !Ref WPDirectory, "/ https://s3.amazonaws.com/aws-refarch/wordpress/latest/bits/opcache-instanceid.php\n",
                     "       fi\n",
@@ -888,7 +953,7 @@ Resources:
 
                   # install w3-total-cache plugin
                   if ! $(wp plugin is-installed w3-total-cache --allow-root); then
-                      wp plugin install w3-total-cache --activate --allow-root
+                      wp plugin install w3-total-cache --allow-root
                   fi
 
                   # install acf pro plugin if supplied
@@ -932,6 +997,47 @@ Resources:
               mode: 000500
               owner: root
               group: root
+        build_wordpress_initialization:
+          files:
+            /tmp/install_wordpress_initialization.sh:
+              content:
+                !Sub |
+                  #!/bin/bash -xe
+                  directory="/var/www/wordpress/${WPDirectory}"
+                  cd "$directory"
+
+                  # set wordpress config
+                  wp config set DISALLOW_FILE_EDIT true --raw --type=constant --allow-root
+
+                  # set wordpress permalink structure
+                  wp rewrite structure "/%postname%/" --allow-root
+
+                  # set wordpress options
+                  wp option set blog_public "0" --allow-root
+                  wp option update uploads_use_yearmonth_folders "0" --allow-root
+
+                  # set Media Cloud plugin options
+                  wp option update ilab-media-s3-access-key "${MediaUploadAccessKeyId}" --allow-root
+                  wp option update ilab-media-s3-bucket "${MediaUploadBucket}" --allow-root
+                  wp option update ilab-media-s3-cache-control "public,max-age=2592000" --allow-root
+                  if [ -n "${CdnUrl}" ]; then
+                    wp option update ilab-media-s3-cdn-base "${CdnUrl}" --allow-root
+                  fi
+                  wp option update ilab-media-s3-delete-uploads "on" --allow-root
+                  wp option update ilab-media-s3-display-s3-badge "on" --allow-root
+                  wp option update ilab-media-s3-prefix "uploads" --allow-root
+                  wp option update ilab-media-s3-region "${AWS::Region}" --allow-root
+                  wp option update ilab-media-s3-secret "${MediaUploadAccessKeySecret}" --allow-root
+                  wp option update ilab-media-storage-provider "s3" --allow-root
+                  wp option update ilab-media-tool-enabled-storage "1" --allow-root
+
+                  # set permission of wordpress site directories
+                  chown -R apache:apache "$directory"
+                  find "$directory" -type d -exec chmod 750 {} \;
+                  find "$directory" -type f -exec chmod 640 {} \;
+              mode: 000500
+              owner: root
+              group: root
         download_aws_ini:
           files:
             /tmp/download_aws_ini.sh:
@@ -962,6 +1068,12 @@ Resources:
           commands:
             install_wordpress_plugins:
               command: ./install_wordpress_plugins.sh
+              cwd: /tmp
+              ignoreErrors: false
+        install_wordpress_initialization:
+          commands:
+            install_wordpress_initialization:
+              command: ./install_wordpress_initialization.sh
               cwd: /tmp
               ignoreErrors: false
         install_cacheclient:
@@ -1014,12 +1126,14 @@ Resources:
             - build_cacheclient
             - build_wordpress
             - build_wordpress_plugins
+            - build_wordpress_initialization
             - build_opcache
             - download_aws_ini
             - install_aws_ini
             - install_cacheclient
             - install_wordpress
             - install_wordpress_plugins
+            - install_wordpress_initialization
             - install_opcache
             - start_webserver
         install_webserver:
@@ -1131,9 +1245,6 @@ Resources:
                     "       # enable HTTPS in wp-config.php if ACM Public SSL Certificate parameter was not empty\n",
                             !If [ NoSslCertificate, !Join [ '', [ "       sed -i \"/$table_prefix = 'wp_';/ a \\# No ACM Public SSL Certificate \" /var/www/wordpress/", !Ref WPDirectory, "/wp-config.php\n" ] ] , !Join [ '', [ "       sed -i \"/$table_prefix = 'wp_';/ a \\$_SERVER['HTTPS'] = 'on';\" /var/www/wordpress/", !Ref WPDirectory, "/wp-config.php\n" ] ] ],
                     "\n",
-                    "       # set permissions of wordpress site directories\n",
-                    "       chown -R apache:apache /var/www/wordpress/", !Ref WPDirectory, "\n",
-                    "       chmod u+wrx /var/www/wordpress/", !Ref WPDirectory, "/wp-content/*\n",
                     "       if [ ! -f /var/www/wordpress/", !Ref WPDirectory, "/opcache-instanceid.php ]; then\n",
                     "         wget -P /var/www/wordpress/", !Ref WPDirectory, "/ https://s3.amazonaws.com/aws-refarch/wordpress/latest/bits/opcache-instanceid.php\n",
                     "       fi\n",
@@ -1160,7 +1271,7 @@ Resources:
 
                   # install w3-total-cache plugin
                   if ! $(wp plugin is-installed w3-total-cache --allow-root); then
-                      wp plugin install w3-total-cache --activate --allow-root
+                      wp plugin install w3-total-cache --allow-root
                   fi
 
                   # install acf pro plugin if supplied
@@ -1204,6 +1315,47 @@ Resources:
               mode: 000500
               owner: root
               group: root
+        build_wordpress_initialization:
+          files:
+            /tmp/install_wordpress_initialization.sh:
+              content:
+                !Sub |
+                  #!/bin/bash -xe
+                  directory="/var/www/wordpress/${WPDirectory}"
+                  cd "$directory"
+
+                  # set wordpress config
+                  wp config set DISALLOW_FILE_EDIT true --raw --type=constant --allow-root
+
+                  # set wordpress permalink structure
+                  wp rewrite structure "/%postname%/" --allow-root
+
+                  # set wordpress options
+                  wp option set blog_public "0" --allow-root
+                  wp option update uploads_use_yearmonth_folders "0" --allow-root
+
+                  # set Media Cloud plugin options
+                  wp option update ilab-media-s3-access-key "${MediaUploadAccessKeyId}" --allow-root
+                  wp option update ilab-media-s3-bucket "${MediaUploadBucket}" --allow-root
+                  wp option update ilab-media-s3-cache-control "public,max-age=2592000" --allow-root
+                  if [ -n "${CdnUrl}" ]; then
+                    wp option update ilab-media-s3-cdn-base "${CdnUrl}" --allow-root
+                  fi
+                  wp option update ilab-media-s3-delete-uploads "on" --allow-root
+                  wp option update ilab-media-s3-display-s3-badge "on" --allow-root
+                  wp option update ilab-media-s3-prefix "uploads" --allow-root
+                  wp option update ilab-media-s3-region "${AWS::Region}" --allow-root
+                  wp option update ilab-media-s3-secret "${MediaUploadAccessKeySecret}" --allow-root
+                  wp option update ilab-media-storage-provider "s3" --allow-root
+                  wp option update ilab-media-tool-enabled-storage "1" --allow-root
+
+                  # set permission of wordpress site directories
+                  chown -R apache:apache "$directory"
+                  find "$directory" -type d -exec chmod 750 {} \;
+                  find "$directory" -type f -exec chmod 640 {} \;
+              mode: 000500
+              owner: root
+              group: root
         download_aws_ini:
           files:
             /tmp/download_aws_ini.sh:
@@ -1234,6 +1386,12 @@ Resources:
           commands:
             install_wordpress_plugins:
               command: ./install_wordpress_plugins.sh
+              cwd: /tmp
+              ignoreErrors: false
+        install_wordpress_initialization:
+          commands:
+            install_wordpress_initialization:
+              command: ./install_wordpress_initialization.sh
               cwd: /tmp
               ignoreErrors: false
         install_cacheclient:
@@ -1275,7 +1433,6 @@ Resources:
 
             /opt/aws/bin/cfn-init --configsets deploy_webserver --verbose --stack ${AWS::StackName} --resource WebLaunchConfiguration70 --region ${AWS::Region}
             /opt/aws/bin/cfn-signal --exit-code $? --stack ${AWS::StackName} --resource WebAutoScalingGroup --region ${AWS::Region}
-
 
 Outputs:
   Opcachestatus:

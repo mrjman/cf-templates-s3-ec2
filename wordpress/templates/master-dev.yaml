@@ -66,6 +66,7 @@ Metadata:
           - WPAdminPassword
           - WPDirectory
           - WPLocale
+          - WPACFProKey
       - Label:
           default: S3/CloudFront
         Parameters:
@@ -133,6 +134,8 @@ Metadata:
         default: Web Tier Instance Type
       WPTitle:
         default: Site Title
+      WPACFProKey:
+        default: '[Optional] Advanced Custom Fields Pro key'
       WPAdminUsername:
         default: Admin Username
       WPAdminPassword:
@@ -521,6 +524,11 @@ Parameters:
     AllowedPattern: ^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$
     Description: The admin email address for WordPress and AWS notifications.
     Type: String
+  WPACFProKey:
+    Default: ''
+    Description: Advanced Custom Fields Pro key
+    NoEcho: true
+    Type: String
   WPAdminPassword:
     AllowedPattern: ^([a-zA-Z0-9`~!#$%^&*()_+,\\-])*$
     ConstraintDescription: Must be letters (upper or lower), numbers, spaces, and these special characters `~!#$%^&*()_+,-
@@ -700,11 +708,15 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Properties:
       Parameters:
+        CdnUrl: !If [ DeployCloudFront, !GetAtt CloudFrontModule.Outputs.DnsHostname, !Ref 'AWS::NoValue' ]
         DatabaseClusterEndpointAddress: !GetAtt RdsModule.Outputs.DatabaseClusterEndpointAddress
         DatabaseMasterUsername: !Ref DatabaseMasterUsername
         DatabaseMasterPassword: !Ref DatabaseMasterPassword
         DatabaseName: !Ref DatabaseName
         EC2KeyName: !Ref EC2KeyName
+        MediaUploadAccessKeyId: !GetAtt S3MediaUploadModule.Outputs.AccessKeyId
+        MediaUploadAccessKeySecret: !GetAtt S3MediaUploadModule.Outputs.AccessKeySecret
+        MediaUploadBucket: !GetAtt S3MediaUploadModule.Outputs.Name
         NumberOfSubnets: !Ref NumberOfAZs
         PHPIniOverride: !Ref PHPIniOverride
         PHPVersion: !Ref PHPVersion
@@ -716,6 +728,7 @@ Resources:
         WebInstanceType: !Ref WebInstanceType
         WebSecurityGroup: !GetAtt SecurityGroupsModule.Outputs.WebSecurityGroup
         Subnet: !GetAtt VpcModule.Outputs.WebSubnet
+        WPACFProKey: !Ref WPACFProKey
         WPAdminEmail: !Ref AdminEmail
         WPAdminPassword: !Ref WPAdminPassword
         WPAdminUsername: !Ref WPAdminUsername
@@ -728,9 +741,14 @@ Resources:
 
 Outputs:
   MediaUploadAccessKeyId:
+    Description: The access key id for the user account that does the uploads
     Value: !GetAtt S3MediaUploadModule.Outputs.AccessKeyId
   MediaUploadAccessKeySecret:
+    Description: The access key secret for the user account that does the uploads
     Value: !GetAtt S3MediaUploadModule.Outputs.AccessKeySecret
+  MediaUploadBucket:
+    Description: The bucket for media uploads
+    Value: !GetAtt S3MediaUploadModule.Outputs.Name
   OpCacheValidationUrl:
     Description: A page to validate OpCache has been enabled for each instance in the ASG. Refresh the page to see the status of each instance in the ASG.
     Value: !Join [ '', [ !If [ CreateRecordSet, !Sub 'http://www.${WPDomainName}', !If [ DeployCloudFront, !GetAtt CloudFrontModule.Outputs.DnsHostname, !GetAtt PublicAlbModule.Outputs.PublicAlbHostname ] ], '/opcache-instanceid.php' ] ]
