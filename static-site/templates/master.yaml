@@ -29,6 +29,7 @@ Metadata:
           - BuildType
           - BuildComputeType
           - BuildImage
+          - UseBuildCache
           - ApiBaseUrl
           - ApiMenuUrl
           - ApiNavMenuUrl
@@ -38,17 +39,21 @@ Metadata:
       - Label:
           default: Lambda@Edge Parameters
         Parameters:
-          - LambdaFunctionDescription
           - LambdaLogsRetentionInDays
+      - Label:
+          default: Slack Build Notification Parameters
+        Parameters:
+          - SlackWebhook
+          - SlackNotifierLogsRetentionInDays
 
 Parameters:
   ApiArtistsUrl:
-    Description: Arists data url
     Default: 'https://s3.amazonaws.com/goeventweb-static.greencopper.com/8b22db9b97ce4d4b864a42f401f87e73/coachella-2018/data/eng/artists.json'
+    Description: Arists data url
     Type: String
   ApiArtistMediaUrl:
-    Description: Arists data url
     Default: 'https://goevent-images.s3.amazonaws.com/coachella-2018/1958aa84/web'
+    Description: Arists data url
     Type: String
   ApiBaseUrl:
     Description: Base api url
@@ -63,23 +68,23 @@ Parameters:
     Description: Media url
     Type: String
   BuildImage:
-    Description: Build machine image
     Default: 'aws/codebuild/nodejs:10.1.0'
+    Description: Build machine image
     Type: String
   BuildComputeType:
     AllowedValues:
       - BUILD_GENERAL1_SMALL
       - BUILD_GENERAL1_MEDIUM
       - BUILD_GENERAL1_LARGE
-    Description: Build machine compute type
     Default: BUILD_GENERAL1_SMALL
+    Description: Build machine compute type
     Type: String
   BuildType:
     AllowedValues:
       - LINUX_CONTAINER
       - WINDOWS_CONTAINER
-    Description: Build machine type
     Default: LINUX_CONTAINER
+    Description: Build machine type
     Type: String
   CertificateArn:
     Description: The ACM certificate to use
@@ -88,12 +93,12 @@ Parameters:
     Description: The domain for the website
     Type: String
   ErrorDocumentPath:
-    Description: The error document
     Default: /404.html
+    Description: The error document
     Type: String
   IndexDocument:
-    Description: The root document of directory
     Default: index.html
+    Description: The root document of directory
     Type: String
   GithubOwnerAccount:
     Description: Github owner account. Can be found in github url /<owner>/<repo>
@@ -111,38 +116,49 @@ Parameters:
     Default: coa.website
     Description: Githut repo name. Can be found in github url /<owner>/<repo>
     Type: String
-  LambdaFunctionDescription:
-    Default: Enables clean urls
-    Description: The description for the lambda FunctionName
-    Type: String
   LambdaLogsRetentionInDays:
-    Description: 'Specifies the number of days you want to retain log events in the specified log group.'
-    Type: Number
-    Default: 14
     AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653]
+    Default: 14
+    Description: Specifies the number of days you want to retain log events in the specified log group
+    Type: Number
   PipelineBucket:
-    Description: The bucket name to store pipeline artifacts
     Default: ''
+    Description: The bucket name to store pipeline artifacts
     Type: String
   PipelineName:
-    Description: The name of the code pipeline
     Default: coachella-static-pipeline
+    Description: The name of the code pipeline
     Type: String
   PriceClass:
     AllowedValues:
       - PriceClass_100
       - PriceClass_200
       - PriceClass_All
-    Description: The price class that corresponds to which edge servers are used.
     Default: PriceClass_All
+    Description: The price class that corresponds to which edge servers are used.
     Type: String
   SiteBucketName:
-    Description: The name to use when generating the S3 bucket for the static site
     Default: coachella-static
+    Description: The name to use when generating the S3 bucket for the static site
+    Type: String
+  SlackNotifierLogsRetentionInDays:
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653]
+    Default: 1
+    Description: Specifies the number of days to retain log events
+    Type: Number
+  SlackWebhook:
+    Description: '[Optional] webhook url for slack build notifications'
+    Type: String
+  UseBuildCache:
+    AllowedValues: [true, false]
+    Default: true
+    Description: Boolean to indicate whether build caches should be used
     Type: String
 
 Conditions:
   HasDomain: !Not [ !Equals [ '', !Ref Domain ] ]
+  HasSlackWebhook: !Not [ !Equals [ '', !Ref SlackWebhook ] ]
+  HasBuildCache: !Equals [ true, !Ref UseBuildCache ]
   NoPipelineBucket: !Equals [ '', !Ref PipelineBucket ]
   NoSiteBucketName: !Equals [ '', !Ref SiteBucketName ]
   UseDefaultCert: !Equals [ '', !Ref CertificateArn ]
@@ -194,6 +210,9 @@ Resources:
     Properties:
       Artifacts:
         Type: CODEPIPELINE
+      Cache:
+        Location: !Sub ${CodePipelineBucket}/cache/archives
+        Type: S3
       Environment:
         ComputeType: !Ref BuildComputeType
         EnvironmentVariables:
@@ -246,6 +265,9 @@ Resources:
                   aws s3 cp s3://${S3SiteBucket}/ s3://${S3SiteBucket}/
                   --exclude "*" --include "*.html" --recursive --metadata-directive REPLACE
                   --cache-control="max-age=0, no-cache, no-store, must-revalidate"
+          cache:
+            paths:
+              - 'node_modules/**/*'
           artifacts:
             files:
               - '**/*'
@@ -402,10 +424,18 @@ Resources:
     Type: 'AWS::CloudFormation::Stack'
     Properties:
       Parameters:
-        FunctionDescription: !Ref LambdaFunctionDescription
         IndexDocument: !Ref IndexDocument
         LogsRetentionInDays: !Ref LambdaLogsRetentionInDays
       TemplateURL: https://s3.amazonaws.com/cf-coachella/static-site/lambda-edge-urls.yaml
+  LambdaBuildNotifier:
+    Condition: HasSlackWebhook
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        CodePipelines: !Ref CodePipeline
+        LogsRetentionInDays: !Ref SlackNotifierLogsRetentionInDays
+        SlackWebhook: !Ref SlackWebhook
+      TemplateURL: https://s3.amazonaws.com/cf-coachella/static-site/lambda-pipeline-slack-notifier.yaml
   S3SiteBucket:
     Type: 'AWS::S3::Bucket'
     Properties:

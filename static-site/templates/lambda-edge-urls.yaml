@@ -20,6 +20,7 @@ Metadata:
 
 Parameters:
   FunctionDescription:
+    Default: Provides clean urls by rewriting requests to the index document
     Description: The description of the lambda function
     Type: String
   IndexDocument:
