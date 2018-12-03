@@ -980,6 +980,29 @@ Outputs:
             ]
           ]
         ]
+  NatRouteTable:
+    Value:
+      !If
+        [ NumberOfAZs1,
+        !Ref NatRoute0,
+        !If
+          [ NumberOfAZs2,
+          !Join [ ',', [ !Ref NatRoute0, !Ref NatRoute1 ] ],
+          !If
+            [ NumberOfAZs3,
+            !Join [ ',', [ !Ref NatRoute0, !Ref NatRoute1, !Ref NatRoute2 ] ],
+            !If
+              [ NumberOfAZs4,
+              !Join [ ',', [ !Ref NatRoute0, !Ref NatRoute1, !Ref NatRoute2, !Ref NatRoute3 ] ],
+              !If
+                [ NumberOfAZs5,
+                !Join [ ',', [ !Ref NatRoute0, !Ref NatRoute1, !Ref NatRoute2, !Ref NatRoute3, !Ref NatRoute4 ] ],
+                !Join [ ',', [ !Ref NatRoute0, !Ref NatRoute1, !Ref NatRoute2, !Ref NatRoute3, !Ref NatRoute4, !Ref NatRoute5 ] ]
+                ]
+              ]
+            ]
+          ]
+        ]
   PublicSubnet:
     Value:
       !If
