@@ -668,6 +668,14 @@ Resources:
         BucketName: !Ref S3MediaBucketName
         Environment: !Ref Environment
       TemplateURL: https://s3.amazonaws.com/cf-coachella/wordpress/s3.yaml
+  S3MediaUploadEndpointModule:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        RouteTableIds: !GetAtt VpcModule.Outputs.NatRouteTable
+        S3Bucket: !GetAtt S3MediaUploadModule.Outputs.Name
+        VpcId: !GetAtt VpcModule.Outputs.Vpc
+      TemplateURL: https://s3.amazonaws.com/cf-coachella/wordpress/s3-endpoint.yaml
   SecurityGroupsModule:
     Condition: AvailableAWSRegion
     Type: AWS::CloudFormation::Stack
