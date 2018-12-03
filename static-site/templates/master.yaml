@@ -29,7 +29,6 @@ Metadata:
           - BuildType
           - BuildComputeType
           - BuildImage
-          - UseBuildCache
           - ApiBaseUrl
           - ApiMenuUrl
           - ApiNavMenuUrl
@@ -149,16 +148,10 @@ Parameters:
   SlackWebhook:
     Description: '[Optional] webhook url for slack build notifications'
     Type: String
-  UseBuildCache:
-    AllowedValues: [true, false]
-    Default: true
-    Description: Boolean to indicate whether build caches should be used
-    Type: String
 
 Conditions:
   HasDomain: !Not [ !Equals [ '', !Ref Domain ] ]
   HasSlackWebhook: !Not [ !Equals [ '', !Ref SlackWebhook ] ]
-  HasBuildCache: !Equals [ true, !Ref UseBuildCache ]
   NoPipelineBucket: !Equals [ '', !Ref PipelineBucket ]
   NoSiteBucketName: !Equals [ '', !Ref SiteBucketName ]
   UseDefaultCert: !Equals [ '', !Ref CertificateArn ]
