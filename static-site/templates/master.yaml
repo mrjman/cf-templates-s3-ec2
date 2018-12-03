@@ -246,6 +246,11 @@ Resources:
                 - npm run generate
             post_build:
               commands:
+                # skip post_build if previous step fails
+                - |
+                  if [ $CODEBUILD_BUILD_SUCCEEDING -ne 1 ]; then
+                    echo 'Build failed - skipping post_build' && exit 1
+                  fi
                 # sync contents to S3
                 - aws s3 sync --delete dist/ s3://${S3SiteBucket}/
                 # set cache-control headers for non html files
