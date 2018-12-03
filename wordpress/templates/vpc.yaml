@@ -984,20 +984,20 @@ Outputs:
     Value:
       !If
         [ NumberOfAZs1,
-        !Ref NatRoute0,
+        !Ref NatRouteTable0,
         !If
           [ NumberOfAZs2,
-          !Join [ ',', [ !Ref NatRoute0, !Ref NatRoute1 ] ],
+          !Join [ ',', [ !Ref NatRouteTable0, !Ref NatRouteTable1 ] ],
           !If
             [ NumberOfAZs3,
-            !Join [ ',', [ !Ref NatRoute0, !Ref NatRoute1, !Ref NatRoute2 ] ],
+            !Join [ ',', [ !Ref NatRouteTable0, !Ref NatRouteTable1, !Ref NatRouteTable2 ] ],
             !If
               [ NumberOfAZs4,
-              !Join [ ',', [ !Ref NatRoute0, !Ref NatRoute1, !Ref NatRoute2, !Ref NatRoute3 ] ],
+              !Join [ ',', [ !Ref NatRouteTable0, !Ref NatRouteTable1, !Ref NatRouteTable2, !Ref NatRouteTable3 ] ],
               !If
                 [ NumberOfAZs5,
-                !Join [ ',', [ !Ref NatRoute0, !Ref NatRoute1, !Ref NatRoute2, !Ref NatRoute3, !Ref NatRoute4 ] ],
-                !Join [ ',', [ !Ref NatRoute0, !Ref NatRoute1, !Ref NatRoute2, !Ref NatRoute3, !Ref NatRoute4, !Ref NatRoute5 ] ]
+                !Join [ ',', [ !Ref NatRouteTable0, !Ref NatRouteTable1, !Ref NatRouteTable2, !Ref NatRouteTable3, !Ref NatRouteTable4 ] ],
+                !Join [ ',', [ !Ref NatRouteTable0, !Ref NatRouteTable1, !Ref NatRouteTable2, !Ref NatRouteTable3, !Ref NatRouteTable4, !Ref NatRouteTable5 ] ]
                 ]
               ]
             ]
