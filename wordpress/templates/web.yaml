@@ -1164,21 +1164,23 @@ Resources:
           files:
             /tmp/create_site_conf.sh:
               content:
-                !Join [
-                  "",[
-                    "#!/bin/bash -xe\n",
-                    "if [ ! -f /etc/httpd/conf.d/", !Ref WPDirectory, ".conf ]; then\n",
-                    "   touch /etc/httpd/conf.d/", !Ref WPDirectory, ".conf\n",
-                    "   echo 'ServerName 127.0.0.1:80' >> /etc/httpd/conf.d/", !Ref WPDirectory, ".conf\n",
-                    "   echo 'DocumentRoot /var/www/wordpress/", !Ref WPDirectory, "' >> /etc/httpd/conf.d/", !Ref WPDirectory, ".conf\n",
-                    "   echo '<Directory /var/www/wordpress/", !Ref WPDirectory, ">' >> /etc/httpd/conf.d/", !Ref WPDirectory, ".conf\n",
-                    "   echo '  Options Indexes FollowSymLinks' >> /etc/httpd/conf.d/", !Ref WPDirectory, ".conf\n",
-                    "   echo '  AllowOverride All' >> /etc/httpd/conf.d/", !Ref WPDirectory, ".conf\n",
-                    "   echo '  Require all granted' >> /etc/httpd/conf.d/", !Ref WPDirectory, ".conf\n",
-                    "   echo '</Directory>' >> /etc/httpd/conf.d/", !Ref WPDirectory, ".conf\n",
-                    "fi\n"
-                  ]
-                ]
+                !Sub |
+                  #!/bin/bash -xe
+                  conf_file="/etc/httpd/conf.d/${WPDirectory}.conf"
+                  directory="/var/www/wordpress/${WPDirectory}"
+
+                  if [ ! -f "$conf_file" ]; then
+                     touch "$conf_file"
+                     echo "ServerSignature Off" >> "$conf_file"
+                     echo "ServerTokens Prod" >> "$conf_file"
+                     echo "ServerName 127.0.0.1:80" >> "$conf_file"
+                     echo "DocumentRoot $directory" >> "$conf_file"
+                     echo "<Directory $directory>" >> "$conf_file"
+                     echo "  Options Indexes FollowSymLinks" >> "$conf_file"
+                     echo "  AllowOverride All" >> "$conf_file"
+                     echo "  Require all granted" >> "$conf_file"
+                     echo "</Directory>" >> "$conf_file"
+                  fi
               mode: 000500
               owner: root
               group: root
