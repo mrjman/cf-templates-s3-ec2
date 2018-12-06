@@ -1390,13 +1390,9 @@ Resources:
           files:
             /tmp/download_aws_ini.sh:
               content:
-                !Join [
-                  "",[
-                    "#!/bin/bash -x\n",
-                    "\n",
-                    "wget -P /etc/php-7.0.d/ ", !Ref PHPIniOverride, "\n"
-                  ]
-                ]
+                !Sub |
+                  #!/bin/bash -x
+                  wget -P "/etc/php-7.0.d/" "${PHPIniOverride}"
               mode: 000500
               owner: root
               group: root
