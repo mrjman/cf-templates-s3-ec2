@@ -429,6 +429,15 @@ Resources:
                   - logs:DescribeLogStreams
                 Resource:
                   - arn:aws:logs:*:*:*
+        - PolicyName: cf-s3-access
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                Resource:
+                  - 'arn:aws:s3:::cf-coachella/*'
   WebAutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
@@ -1119,6 +1128,12 @@ Resources:
     Condition: PHP70
     Type: AWS::AutoScaling::LaunchConfiguration
     Metadata:
+      AWS::CloudFormation::Authentication:
+        S3Access:
+          type: S3
+          roleName: !Ref WebInstanceRole
+          buckets:
+            - 'cf-coachella'
       AWS::CloudFormation::Init:
         configSets:
           deploy_webserver:
