@@ -27,6 +27,7 @@ Metadata:
         Parameters:
           - NumberOfAZs
           - AvailabilityZones
+          - UsePrivateSubnets
       - Label:
           default: Database
         Parameters:
@@ -124,6 +125,8 @@ Metadata:
         default: Cache Cluster (ElastiCache)
       UseCloudFrontBoolean:
         default: CDN (CloudFront)
+      UsePrivateSubnets:
+        default: Use Private Subnets
       UseRoute53Boolean:
         default: DNS record set (Route53)
       WebAsgMax:
@@ -371,7 +374,7 @@ Parameters:
     Type: Number
   PHPIniOverride:
     Default: https://s3.amazonaws.com/cf-coachella/wordpress/bits/20-aws.ini
-    Description: Full Amazon S3 https path to a php.ini override file (e.g. https://s3.amazonaws.com/aws-refarch/wordpress/latest/bits/20-aws.ini)
+    Description: '[Optional] Full Amazon S3 https path to a php.ini override file'
     Type: String
   PHPVersion:
     AllowedValues: [5.5, 5.6, 7.0]
@@ -400,6 +403,11 @@ Parameters:
     AllowedValues: [true, false]
     Default: true
     Description: Specifies whether an ElastiCache Cache Cluster should be created to cache WordPress database content.
+    Type: String
+  UsePrivateSubnets:
+    AllowedValues: [true, false]
+    Default: true
+    Description: Specifies wether to use private subnets in VPC (should be true for production)
     Type: String
   UseRoute53Boolean:
     AllowedValues: [true, false]
@@ -589,6 +597,7 @@ Conditions:
     - !Equals [ true, !Ref UseElastiCacheBoolean ]
     - !Condition AvailableAWSRegion
   MySqlDbEngine: !Equals [ 'mysql', !Ref DatabaseEngine ]
+  PrivateSubnetsEnabled: !Equals [ UsePrivateSubnets, true ]
 
 Resources:
   BastionModule:
@@ -618,7 +627,7 @@ Resources:
     Type: AWS::CloudFormation::Stack
     Properties:
       Parameters:
-        Subnet: !GetAtt VpcModule.Outputs.DataSubnet
+        Subnet: !If [ PrivateSubnetsEnabled, !GetAtt VpcModule.Outputs.DataSubnet, !GetAtt VpcModule.Outputs.PublicSubnet ]
         ElastiCacheNodeType: !Ref ElastiCacheNodeType
         ElastiCacheSecurityGroup: !GetAtt SecurityGroupsModule.Outputs.ElastiCacheSecurityGroup
         NumberOfSubnets: !Ref NumberOfAZs
@@ -648,7 +657,7 @@ Resources:
         DatabaseSecurityGroup: !GetAtt SecurityGroupsModule.Outputs.DatabaseSecurityGroup
         MultiAZ: !If [ MySqlDbEngine, !Ref DatabaseMultiAz, !Ref 'AWS::NoValue' ]
         NumberOfSubnets: !Ref NumberOfAZs
-        Subnet: !GetAtt VpcModule.Outputs.DataSubnet
+        Subnet: !If [ PrivateSubnetsEnabled, !GetAtt VpcModule.Outputs.DataSubnet, !GetAtt VpcModule.Outputs.PublicSubnet ]
       TemplateURL: !If [ MySqlDbEngine, 'https://s3.amazonaws.com/cf-coachella/wordpress/rds-mysql.yaml', 'https://s3.amazonaws.com/cf-coachella/wordpress/rds-aurora.yaml' ]
   Route53Module:
     Condition: CreateRecordSet
@@ -669,6 +678,7 @@ Resources:
         Environment: !Ref Environment
       TemplateURL: https://s3.amazonaws.com/cf-coachella/wordpress/s3.yaml
   S3MediaUploadEndpointModule:
+    Condition: PrivateSubnetsEnabled
     Type: AWS::CloudFormation::Stack
     Properties:
       Parameters:
@@ -735,7 +745,7 @@ Resources:
         WebAsgMin: !Ref WebAsgMin
         WebInstanceType: !Ref WebInstanceType
         WebSecurityGroup: !GetAtt SecurityGroupsModule.Outputs.WebSecurityGroup
-        Subnet: !GetAtt VpcModule.Outputs.WebSubnet
+        Subnet: !If [ PrivateSubnetsEnabled, !GetAtt VpcModule.Outputs.WebSubnet, !GetAtt VpcModule.Outputs.PublicSubnet ]
         WPACFProKey: !Ref WPACFProKey
         WPAdminEmail: !Ref AdminEmail
         WPAdminPassword: !Ref WPAdminPassword
