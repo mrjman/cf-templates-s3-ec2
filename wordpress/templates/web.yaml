@@ -1358,10 +1358,10 @@ Resources:
                   wp config set DISALLOW_FILE_EDIT true --raw --type=constant --allow-root
 
                   # set wordpress permalink structure
-                  wp rewrite structure "/%postname%/" --allow-root
+                  wp rewrite structure "/%postname%/" --hard --allow-root
 
                   # set wordpress options
-                  wp option set blog_public "0" --allow-root
+                  wp option update blog_public "0" --allow-root
                   wp option update uploads_use_yearmonth_folders "0" --allow-root
 
                   # set Media Cloud plugin options
