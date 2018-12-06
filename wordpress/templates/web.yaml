@@ -1236,45 +1236,58 @@ Resources:
           files:
             /tmp/install_wordpress.sh:
               content:
-                !Join [
-                  "",[
-                    "#!/bin/bash -xe\n",
-                    "\n",
-                    "# install wp-cli\n",
-                    "if [ ! -f /bin/wp/wp-cli.phar ]; then\n",
-                    "   curl -o /bin/wp https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar\n",
-                    "   chmod +x /bin/wp\n",
-                    "fi\n",
-                    "\n",
-                    "# make site directory\n",
-                    "if [ ! -d /var/www/wordpress/", !Ref WPDirectory, " ]; then\n",
-                    "   mkdir -p /var/www/wordpress/", !Ref WPDirectory, "\n",
-                    "\n",
-                    "   cd /var/www/wordpress/", !Ref WPDirectory, "\n",
-                    "   # install wordpress if not installed\n",
-                    "   # use public alb host name if wp domain name was empty\n",
-                    "   if ! $(wp core is-installed --allow-root); then\n",
-                    "       wp core download --version='", !Ref WPVersion, "' --locale='", !Ref WPLocale, "' --allow-root\n",
-                    "       wp core config --dbname='", !Ref DatabaseName, "' --dbuser='", !Ref DatabaseMasterUsername, "' --dbpass='", !Ref DatabaseMasterPassword, "' --dbhost='", !Ref DatabaseClusterEndpointAddress, "' --dbprefix=wp_ --allow-root\n",
-                    "       wp core install --url=", !If [ NoWPDomainName, !Ref PublicAlbHostname, !Join [ "", [ "'http://www.", !Ref WPDomainName, "'" ] ] ], " --title='", !Ref WPTitle, "' --admin_user='", !Ref WPAdminUsername, "' --admin_password='", !Ref WPAdminPassword, "' --admin_email='", !Ref WPAdminEmail, "' --skip-email --allow-root\n",
-                    "       sed -i \"/$table_prefix = 'wp_';/ a \\define('WP_HOME', 'http://' . \\$_SERVER['HTTP_HOST']); \" /var/www/wordpress/", !Ref WPDirectory, "/wp-config.php\n",
-                    "       sed -i \"/$table_prefix = 'wp_';/ a \\define('WP_SITEURL', 'http://' . \\$_SERVER['HTTP_HOST']); \" /var/www/wordpress/", !Ref WPDirectory, "/wp-config.php\n",
-                    "       # enable HTTPS in wp-config.php if ACM Public SSL Certificate parameter was not empty\n",
-                            !If [ NoSslCertificate, !Join [ '', [ "       sed -i \"/$table_prefix = 'wp_';/ a \\# No ACM Public SSL Certificate \" /var/www/wordpress/", !Ref WPDirectory, "/wp-config.php\n" ] ] , !Join [ '', [ "       sed -i \"/$table_prefix = 'wp_';/ a \\$_SERVER['HTTPS'] = 'on';\" /var/www/wordpress/", !Ref WPDirectory, "/wp-config.php\n" ] ] ],
-                    "\n",
-                    "       if [ ! -f /var/www/wordpress/", !Ref WPDirectory, "/opcache-instanceid.php ]; then\n",
-                    "         wget -P /var/www/wordpress/", !Ref WPDirectory, "/ https://s3.amazonaws.com/aws-refarch/wordpress/latest/bits/opcache-instanceid.php\n",
-                    "       fi\n",
-                    "   fi\n",
-                    "   RESULT=$?\n",
-                    "   if [ $RESULT -eq 0 ]; then\n",
-                    "       touch /var/www/wordpress/", !Ref WPDirectory, "/wordpress.initialized\n",
-                    "         else\n",
-                    "       touch /var/www/wordpress/", !Ref WPDirectory, "/wordpress.failed\n",
-                    "   fi\n",
-                    "fi\n"
-                  ]
-                ]
+                !Sub
+                  - |
+                    #!/bin/bash -xe
+
+                    # install wp-cli
+                    if [ ! -f "/bin/wp/wp-cli.phar" ]; then
+                      curl -o "/bin/wp" "https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar"
+                      chmod +x "/bin/wp"
+                    fi
+
+                    wp_cli_config="/var/www/wordpress/wp-cli.yml"
+                    if [ ! -f "$wp_cli_config" ]; then
+                      echo "apache_modules: [mod_rewrite]" >> "$wp_cli_config"
+                    fi
+
+                    directory="/var/www/wordpress/${WPDirectory}"
+
+                    # make site directory
+                    if [ ! -d "$directory" ]; then
+                      mkdir -p "$directory" && cd "$directory"
+
+                      # install wordpress if not installed
+                      # use public alb host name if wp domain name was empty
+                      if ! $(wp core is-installed --allow-root); then
+                        wp core download --version="${WPVersion}" --locale="${WPLocale}" --allow-root
+                        wp core config --dbname="${DatabaseName}" --dbuser="${DatabaseMasterUsername}" --dbpass="${DatabaseMasterPassword}" --dbhost="${DatabaseClusterEndpointAddress}" --dbprefix="wp_" --allow-root
+                        wp core install --url="${DomainUrl}" --title="${WPTitle}" --admin_user="${WPAdminUsername}" --admin_password="${WPAdminPassword}" --admin_email="${WPAdminEmail}" --skip-email --allow-root
+
+                        sed -i "/$table_prefix = 'wp_';/a define('WP_HOME', 'http://' . \$_SERVER['HTTP_HOST']);" "$directory/wp-config.php"
+                        sed -i "/$table_prefix = 'wp_';/a define('WP_SITEURL', 'http://' . \$_SERVER['HTTP_HOST']);" "$directory/wp-config.php"
+
+                        # enable HTTPS in wp-config.php if ACM Public SSL Certificate parameter was not empty
+                        if [ "${HttpsEnabled}" = true ]; then
+                          sed -i "/$table_prefix = 'wp_';/a \$_SERVER['HTTPS'] = 'on';" "$directory/wp-config.php"
+                        else
+                          sed -i "/$table_prefix = 'wp_';/a # No ACM Public SSL Certificate" "$directory/wp-config.php"
+                        fi
+
+                        if [ ! -f "$directory/opcache-instanceid.php" ]; then
+                          wget -P "$directory/" "https://s3.amazonaws.com/aws-refarch/wordpress/latest/bits/opcache-instanceid.php"
+                        fi
+                      fi
+
+                      RESULT=$?
+
+                      if [ $RESULT -eq 0 ]; then
+                        touch "$directory/wordpress.initialized"
+                      else
+                        touch "$directory/wordpress.failed"
+                      fi
+                    fi
+                  - { DomainUrl: !If [ NoWPDomainName, !Ref PublicAlbHostname, !Join [ "", [ "'http://www.", !Ref WPDomainName, "'" ] ] ], HttpsEnabled: !If [ NoSslCertificate, false, true ] }
               mode: 000500
               owner: root
               group: root
