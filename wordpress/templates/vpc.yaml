@@ -44,6 +44,7 @@ Metadata:
       - DataSubnet3Cidr
       - DataSubnet4Cidr
       - DataSubnet5Cidr
+      - UsePrivateSubnets
     ParameterLabels:
       AvailabilityZones:
         default: Availability Zones
@@ -89,6 +90,8 @@ Metadata:
         default: Data Subnet 4
       DataSubnet5Cidr:
         default: Data Subnet 5
+      UsePrivateSubnets:
+        default: Use Private Subnets
 
 Parameters:
 
@@ -228,6 +231,11 @@ Parameters:
     Default: 10.0.20.0/22
     Description: CIDR block for Web subnet 5 located in Availability Zone 5
     Type: String
+  UsePrivateSubnets:
+    AllowedValues: [true, false]
+    Default: true
+    Description: Whether to use private subnets (should be true for production)
+    Type: String
 
 Conditions:
 
@@ -269,6 +277,13 @@ Conditions:
     - !Condition NumberOfAZs5
     - !Condition NumberOfAZs6
   AZ5: !Condition NumberOfAZs6
+  CreateNat0: !And [ !Condition AZ0, !Condition PrivateSubnetsEnabled ]
+  CreateNat1: !And [ !Condition AZ1, !Condition PrivateSubnetsEnabled ]
+  CreateNat2: !And [ !Condition AZ2, !Condition PrivateSubnetsEnabled ]
+  CreateNat3: !And [ !Condition AZ3, !Condition PrivateSubnetsEnabled ]
+  CreateNat4: !And [ !Condition AZ4, !Condition PrivateSubnetsEnabled ]
+  CreateNat5: !And [ !Condition AZ5, !Condition PrivateSubnetsEnabled ]
+  PrivateSubnetsEnabled: !Equals [ UsePrivateSubnets, true ]
 
 Resources:
 
@@ -355,37 +370,37 @@ Resources:
     Condition: AZ0
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref NatRouteTable0
+      RouteTableId: !If [ PrivateSubnetsEnabled, !Ref NatRouteTable0, !Ref PublicRouteTable ]
       SubnetId: !Ref WebSubnet0
   WebSubnetRouteTableAssociation1:
     Condition: AZ1
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref NatRouteTable1
+      RouteTableId: !If [ PrivateSubnetsEnabled, !Ref NatRouteTable1, !Ref PublicRouteTable ]
       SubnetId: !Ref WebSubnet1
   WebSubnetRouteTableAssociation2:
     Condition: AZ2
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref NatRouteTable2
+      RouteTableId: !If [ PrivateSubnetsEnabled, !Ref NatRouteTable2, !Ref PublicRouteTable ]
       SubnetId: !Ref WebSubnet2
   WebSubnetRouteTableAssociation3:
     Condition: AZ3
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref NatRouteTable3
+      RouteTableId: !If [ PrivateSubnetsEnabled, !Ref NatRouteTable3, !Ref PublicRouteTable ]
       SubnetId: !Ref WebSubnet3
   WebSubnetRouteTableAssociation4:
     Condition: AZ4
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref NatRouteTable4
+      RouteTableId: !If [ PrivateSubnetsEnabled, !Ref NatRouteTable4, !Ref PublicRouteTable ]
       SubnetId: !Ref WebSubnet4
   WebSubnetRouteTableAssociation5:
     Condition: AZ5
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref NatRouteTable5
+      RouteTableId: !If [ PrivateSubnetsEnabled, !Ref NatRouteTable5, !Ref PublicRouteTable ]
       SubnetId: !Ref WebSubnet5
 
   DataSubnet0:
@@ -471,37 +486,37 @@ Resources:
     Condition: AZ0
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref NatRouteTable0
+      RouteTableId: !If [ PrivateSubnetsEnabled, !Ref NatRouteTable0, !Ref PublicRouteTable ]
       SubnetId: !Ref DataSubnet0
   DataSubnetRouteTableAssociation1:
     Condition: AZ1
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref NatRouteTable1
+      RouteTableId: !If [ PrivateSubnetsEnabled, !Ref NatRouteTable1, !Ref PublicRouteTable ]
       SubnetId: !Ref DataSubnet1
   DataSubnetRouteTableAssociation2:
     Condition: AZ2
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref NatRouteTable2
+      RouteTableId: !If [ PrivateSubnetsEnabled, !Ref NatRouteTable2, !Ref PublicRouteTable ]
       SubnetId: !Ref DataSubnet2
   DataSubnetRouteTableAssociation3:
     Condition: AZ3
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref NatRouteTable3
+      RouteTableId: !If [ PrivateSubnetsEnabled, !Ref NatRouteTable3, !Ref PublicRouteTable ]
       SubnetId: !Ref DataSubnet3
   DataSubnetRouteTableAssociation4:
     Condition: AZ4
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref NatRouteTable4
+      RouteTableId: !If [ PrivateSubnetsEnabled, !Ref NatRouteTable4, !Ref PublicRouteTable ]
       SubnetId: !Ref DataSubnet4
   DataSubnetRouteTableAssociation5:
     Condition: AZ5
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      RouteTableId: !Ref NatRouteTable5
+      RouteTableId: !If [ PrivateSubnetsEnabled, !Ref NatRouteTable5, !Ref PublicRouteTable ]
       SubnetId: !Ref DataSubnet5
 
   InternetGateway:
@@ -517,26 +532,26 @@ Resources:
       VpcId: !Ref Vpc
 
   NatEIP0:
-    Condition: AZ0
+    Condition: CreateNat0
     Type: AWS::EC2::EIP
     Properties:
       Domain: vpc
   NatGateway0:
-    Condition: AZ0
+    Condition: CreateNat0
     Type: AWS::EC2::NatGateway
     DependsOn: AttachInternetGateway
     Properties:
       AllocationId: !GetAtt NatEIP0.AllocationId
       SubnetId: !Ref PublicSubnet0
   NatRoute0:
-    Condition: AZ0
+    Condition: CreateNat0
     Type: AWS::EC2::Route
     Properties:
       RouteTableId: !Ref NatRouteTable0
       DestinationCidrBlock: 0.0.0.0/0
       NatGatewayId: !Ref NatGateway0
   NatRouteTable0:
-    Condition: AZ0
+    Condition: CreateNat0
     Type: AWS::EC2::RouteTable
     Properties:
       Tags:
@@ -547,26 +562,26 @@ Resources:
       VpcId: !Ref Vpc
 
   NatEIP1:
-    Condition: AZ1
+    Condition: CreateNat1
     Type: AWS::EC2::EIP
     Properties:
       Domain: vpc
   NatGateway1:
-    Condition: AZ1
+    Condition: CreateNat1
     Type: AWS::EC2::NatGateway
     DependsOn: AttachInternetGateway
     Properties:
       AllocationId: !GetAtt NatEIP1.AllocationId
       SubnetId: !Ref PublicSubnet1
   NatRoute1:
-    Condition: AZ1
+    Condition: CreateNat1
     Type: AWS::EC2::Route
     Properties:
       RouteTableId: !Ref NatRouteTable1
       DestinationCidrBlock: 0.0.0.0/0
       NatGatewayId: !Ref NatGateway1
   NatRouteTable1:
-    Condition: AZ1
+    Condition: CreateNat1
     Type: AWS::EC2::RouteTable
     Properties:
       Tags:
@@ -577,26 +592,26 @@ Resources:
       VpcId: !Ref Vpc
 
   NatEIP2:
-    Condition: AZ2
+    Condition: CreateNat2
     Type: AWS::EC2::EIP
     Properties:
       Domain: vpc
   NatGateway2:
-    Condition: AZ2
+    Condition: CreateNat2
     Type: AWS::EC2::NatGateway
     DependsOn: AttachInternetGateway
     Properties:
       AllocationId: !GetAtt NatEIP2.AllocationId
       SubnetId: !Ref PublicSubnet2
   NatRoute2:
-    Condition: AZ2
+    Condition: CreateNat2
     Type: AWS::EC2::Route
     Properties:
       RouteTableId: !Ref NatRouteTable2
       DestinationCidrBlock: 0.0.0.0/0
       NatGatewayId: !Ref NatGateway2
   NatRouteTable2:
-    Condition: AZ2
+    Condition: CreateNat2
     Type: AWS::EC2::RouteTable
     Properties:
       Tags:
@@ -607,26 +622,26 @@ Resources:
       VpcId: !Ref Vpc
 
   NatEIP3:
-    Condition: AZ3
+    Condition: CreateNat3
     Type: AWS::EC2::EIP
     Properties:
       Domain: vpc
   NatGateway3:
-    Condition: AZ3
+    Condition: CreateNat3
     Type: AWS::EC2::NatGateway
     DependsOn: AttachInternetGateway
     Properties:
       AllocationId: !GetAtt NatEIP3.AllocationId
       SubnetId: !Ref PublicSubnet3
   NatRoute3:
-    Condition: AZ3
+    Condition: CreateNat3
     Type: AWS::EC2::Route
     Properties:
       RouteTableId: !Ref NatRouteTable3
       DestinationCidrBlock: 0.0.0.0/0
       NatGatewayId: !Ref NatGateway3
   NatRouteTable3:
-    Condition: AZ3
+    Condition: CreateNat3
     Type: AWS::EC2::RouteTable
     Properties:
       Tags:
@@ -637,26 +652,26 @@ Resources:
       VpcId: !Ref Vpc
 
   NatEIP4:
-    Condition: AZ4
+    Condition: CreateNat4
     Type: AWS::EC2::EIP
     Properties:
       Domain: vpc
   NatGateway4:
-    Condition: AZ4
+    Condition: CreateNat4
     Type: AWS::EC2::NatGateway
     DependsOn: AttachInternetGateway
     Properties:
       AllocationId: !GetAtt NatEIP4.AllocationId
       SubnetId: !Ref PublicSubnet4
   NatRoute4:
-    Condition: AZ4
+    Condition: CreateNat4
     Type: AWS::EC2::Route
     Properties:
       RouteTableId: !Ref NatRouteTable4
       DestinationCidrBlock: 0.0.0.0/0
       NatGatewayId: !Ref NatGateway4
   NatRouteTable4:
-    Condition: AZ4
+    Condition: CreateNat4
     Type: AWS::EC2::RouteTable
     Properties:
       Tags:
@@ -667,26 +682,26 @@ Resources:
       VpcId: !Ref Vpc
 
   NatEIP5:
-    Condition: AZ5
+    Condition: CreateNat5
     Type: AWS::EC2::EIP
     Properties:
       Domain: vpc
   NatGateway5:
-    Condition: AZ5
+    Condition: CreateNat5
     Type: AWS::EC2::NatGateway
     DependsOn: AttachInternetGateway
     Properties:
       AllocationId: !GetAtt NatEIP5.AllocationId
       SubnetId: !Ref PublicSubnet5
   NatRoute5:
-    Condition: AZ5
+    Condition: CreateNat5
     Type: AWS::EC2::Route
     Properties:
       RouteTableId: !Ref NatRouteTable5
       DestinationCidrBlock: 0.0.0.0/0
       NatGatewayId: !Ref NatGateway5
   NatRouteTable5:
-    Condition: AZ5
+    Condition: CreateNat5
     Type: AWS::EC2::RouteTable
     Properties:
       Tags:
@@ -983,26 +998,30 @@ Outputs:
   NatRouteTable:
     Value:
       !If
-        [ NumberOfAZs1,
-        !Ref NatRouteTable0,
+        [ PrivateSubnetsEnabled,
         !If
-          [ NumberOfAZs2,
-          !Join [ ',', [ !Ref NatRouteTable0, !Ref NatRouteTable1 ] ],
+          [ NumberOfAZs1,
+          !Ref NatRouteTable0,
           !If
-            [ NumberOfAZs3,
-            !Join [ ',', [ !Ref NatRouteTable0, !Ref NatRouteTable1, !Ref NatRouteTable2 ] ],
+            [ NumberOfAZs2,
+            !Join [ ',', [ !Ref NatRouteTable0, !Ref NatRouteTable1 ] ],
             !If
-              [ NumberOfAZs4,
-              !Join [ ',', [ !Ref NatRouteTable0, !Ref NatRouteTable1, !Ref NatRouteTable2, !Ref NatRouteTable3 ] ],
+              [ NumberOfAZs3,
+              !Join [ ',', [ !Ref NatRouteTable0, !Ref NatRouteTable1, !Ref NatRouteTable2 ] ],
               !If
-                [ NumberOfAZs5,
-                !Join [ ',', [ !Ref NatRouteTable0, !Ref NatRouteTable1, !Ref NatRouteTable2, !Ref NatRouteTable3, !Ref NatRouteTable4 ] ],
-                !Join [ ',', [ !Ref NatRouteTable0, !Ref NatRouteTable1, !Ref NatRouteTable2, !Ref NatRouteTable3, !Ref NatRouteTable4, !Ref NatRouteTable5 ] ]
+                [ NumberOfAZs4,
+                !Join [ ',', [ !Ref NatRouteTable0, !Ref NatRouteTable1, !Ref NatRouteTable2, !Ref NatRouteTable3 ] ],
+                !If
+                  [ NumberOfAZs5,
+                  !Join [ ',', [ !Ref NatRouteTable0, !Ref NatRouteTable1, !Ref NatRouteTable2, !Ref NatRouteTable3, !Ref NatRouteTable4 ] ],
+                  !Join [ ',', [ !Ref NatRouteTable0, !Ref NatRouteTable1, !Ref NatRouteTable2, !Ref NatRouteTable3, !Ref NatRouteTable4, !Ref NatRouteTable5 ] ]
+                  ]
                 ]
               ]
             ]
-          ]
-        ]
+          ],
+        ''
+      ]
   PublicSubnet:
     Value:
       !If
