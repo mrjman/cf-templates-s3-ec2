@@ -1299,11 +1299,6 @@ Resources:
                   #!/bin/bash -xe
                   cd /var/www/wordpress/${WPDirectory}
 
-                  # install w3-total-cache plugin
-                  if ! $(wp plugin is-installed w3-total-cache --allow-root); then
-                      wp plugin install w3-total-cache --allow-root
-                  fi
-
                   # install acf pro plugin if supplied
                   if [ -n "${WPACFProKey}" ]; then
                     if ! $(wp plugin is-installed advanced-custom-fields-pro --allow-root); then
@@ -1341,6 +1336,11 @@ Resources:
                   # install notification plugin
                   if ! $(wp plugin is-installed notification --allow-root); then
                       wp plugin install notification --activate --allow-root
+                  fi
+
+                  # install duplicate post plugin
+                  if ! $(wp plugin is-installed duplicate-post --allow-root); then
+                      wp plugin install duplicate-post --activate --allow-root
                   fi
               mode: 000500
               owner: root
