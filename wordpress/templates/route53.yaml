@@ -52,9 +52,9 @@ Resources:
   RecordSet:
     Type: AWS::Route53::RecordSetGroup
     Properties:
-      HostedZoneName: !Join ['', [!Ref WPDomainName, '.']]
+      HostedZoneName: !Sub ${WPDomainName}.
       RecordSets:
-        - Name: !Join ['', ['www.', !Ref WPDomainName, '.']]
+        - Name: !Sub www.${WPDomainName}.
           Type: A
           AliasTarget:
             DNSName: !Ref DnsEndpoint
