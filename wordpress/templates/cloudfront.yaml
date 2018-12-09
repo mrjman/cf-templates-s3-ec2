@@ -142,7 +142,7 @@ Resources:
           - DomainName: !Ref PublicAlbDnsName
             Id: elb
             CustomOriginConfig:
-              OriginProtocolPolicy: http-only
+              OriginProtocolPolicy: !If [ UseDefaultCert, 'http-only', 'https-only' ]
           - !If
             - HasMediaBucket
             - DomainName: !Ref S3MediaBucketOrigin
@@ -153,6 +153,7 @@ Resources:
         ViewerCertificate:
           AcmCertificateArn: !If [ UseDefaultCert, !Ref 'AWS::NoValue', !Ref CloudFrontAcmCertificate ]
           CloudFrontDefaultCertificate: !If [ UseDefaultCert, true, !Ref 'AWS::NoValue' ]
+          MinimumProtocolVersion: !If [ UseDefaultCert, !Ref 'AWS::NoValue', TLSv1 ]
           SslSupportMethod: !If [ UseDefaultCert, !Ref 'AWS::NoValue', 'sni-only' ]
 
 Outputs:
