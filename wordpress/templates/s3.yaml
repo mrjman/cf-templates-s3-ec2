@@ -80,7 +80,7 @@ Resources:
                   - s3:HeadBucket
                 Effect: Allow
                 Resource: '*'
-      UserName: !Sub 'media-upload-${Environment}-${AWS::Region}'
+      UserName: !Sub '${AWS::Region}-${Bucket}'
   IamAccessKey:
     Type: AWS::IAM::AccessKey
     Properties:
