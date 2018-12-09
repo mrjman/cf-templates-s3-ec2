@@ -362,12 +362,13 @@ Parameters:
     AllowedValues:
       - latest
       - nightly
-      - 4.5
-      - 4.6
-      - 4.7
-      - 4.8
-      - 4.9
-    Default: latest
+      - 4.5.3
+      - 4.6.1
+      - 4.7.4
+      - 4.8.2
+      - 4.9.8
+      - 5.0
+    Default: 4.9.8
     Description: The WordPress version (make sure this version is compatible with the PHP version selected above).
     Type: String
 
@@ -1143,14 +1144,13 @@ Resources:
             - build_wordpress_plugins
             - build_wordpress_initialization
             - build_opcache
-            - download_aws_ini
             - install_aws_ini
             - install_cacheclient
             - install_wordpress
             - install_htaccess
             - install_wordpress_plugins
-            - install_wordpress_initialization
             - install_opcache
+            - install_wordpress_initialization
             - start_webserver
         install_webserver:
           packages:
@@ -1199,8 +1199,6 @@ Resources:
               content:
                 !Sub |
                   #!/bin/bash -xe
-                  wget -P /tmp/ https://s3.amazonaws.com/cf-coachella/wordpress/config-files/AmazonElastiCacheClusterClient-2.0.1-PHP70-64bit.tar.gz
-                  tar -xf '/tmp/AmazonElastiCacheClusterClient-2.0.1-PHP70-64bit.tar.gz'
                   cp '/tmp/artifact/amazon-elasticache-cluster-client.so' /usr/lib64/php/7.0/modules/
                   if [ ! -f /etc/php-7.0.d/50-memcached.ini ]; then
                       touch /etc/php-7.0.d/50-memcached.ini
@@ -1210,6 +1208,8 @@ Resources:
               mode: 000500
               owner: root
               group: root
+          sources:
+            /tmp: https://s3.amazonaws.com/cf-coachella/wordpress/config-files/AmazonElastiCacheClusterClient-2.0.1-PHP70-64bit.tar.gz
         build_opcache:
           packages:
             yum:
@@ -1221,15 +1221,22 @@ Resources:
                   #!/bin/bash -xe
                   # create hidden opcache directory locally & change owner to apache
                   if [ ! -d /var/www/.opcache ]; then
-                      mkdir -p /var/www/.opcache
+                    mkdir -p /var/www/.opcache
                   fi
+
                   # enable opcache in /etc/php-7.0.d/10-opcache.ini
                   sed -i 's/;opcache.file_cache=.*/opcache.file_cache=\/var\/www\/.opcache/' /etc/php-7.0.d/10-opcache.ini
                   sed -i 's/opcache.memory_consumption=.*/opcache.memory_consumption=512/' /etc/php-7.0.d/10-opcache.ini
+
                   # download opcache-instance.php to verify opcache status
-                  if [ ! -f /var/www/wordpress/${WPDirectory}/opcache-instanceid.php ]; then
-                      wget -P /var/www/wordpress/${WPDirectory}/ https://s3.amazonaws.com/cf-coachella/wordpress/config-files/opcache-instanceid.php
+                  if [ ! -f "/var/www/wordpress/${WPDirectory}/opcache-instanceid.php" ]; then
+                    mv "/tmp/opcache-instanceid.php" "/var/www/wordpress/${WPDirectory}/"
                   fi
+              mode: 000500
+              owner: root
+              group: root
+            /tmp/opcache-instanceid.php:
+              source: https://s3.amazonaws.com/cf-coachella/wordpress/config-files/opcache-instanceid.php
               mode: 000500
               owner: root
               group: root
@@ -1273,10 +1280,6 @@ Resources:
                           sed -i "/$table_prefix = 'wp_';/a \$_SERVER['HTTPS'] = 'on';" "$directory/wp-config.php"
                         else
                           sed -i "/$table_prefix = 'wp_';/a # No ACM Public SSL Certificate" "$directory/wp-config.php"
-                        fi
-
-                        if [ ! -f "$directory/opcache-instanceid.php" ]; then
-                          wget -P "$directory/" "https://s3.amazonaws.com/cf-coachella/wordpress/config-files/opcache-instanceid.php"
                         fi
                       fi
 
@@ -1364,6 +1367,9 @@ Resources:
                   # set wordpress options
                   wp option update blog_public "0" --allow-root
                   wp option update uploads_use_yearmonth_folders "0" --allow-root
+                  wp option update default_comment_status "closed" --allow-root
+                  wp option update default_ping_status "closed" --allow-root
+                  wp option update default_pingback_flag "0" --allow-root
 
                   # set Media Cloud plugin options
                   wp option update ilab-media-s3-access-key "${MediaUploadAccessKeyId}" --allow-root
@@ -1387,28 +1393,24 @@ Resources:
               mode: 000500
               owner: root
               group: root
-        download_aws_ini:
+        install_cacheclient:
+          commands:
+            install_cacheclient:
+              command: ./install_cacheclient.sh
+              cwd: /tmp
+              ignoreErrors: false
+        install_aws_ini:
           files:
-            /tmp/download_aws_ini.sh:
-              content:
-                !Sub |
-                  #!/bin/bash -x
-                  wget -P "/etc/php-7.0.d/" "${PHPIniOverride}"
+            /tmp/20-aws.ini:
+              source: !Ref PHPIniOverride
               mode: 000500
               owner: root
               group: root
-        install_aws_ini:
           commands:
             install_aws_ini:
-              command: ./download_aws_ini.sh
+              command: cp "20-aws.ini" "/etc/php-7.0.d/"
               cwd: /tmp
               ignoreErrors: true
-        install_wordpress:
-          commands:
-            install_wordpress:
-              command: ./install_wordpress.sh
-              cwd: /tmp
-              ignoreErrors: false
         install_htaccess:
           files:
             /tmp/.htaccess:
@@ -1423,11 +1425,23 @@ Resources:
               group: root
           commands:
             install_htaccess:
-              command: !Sub cp .htaccess /var/www/wordpress/${WPDirectory}/
+              command: !Sub cp .htaccess "/var/www/wordpress/${WPDirectory}/"
               cwd: /tmp
               ignoreErrors: false
             install_htaccess_uploads:
-              command: !Sub mkdir -p /var/www/wordpress/${WPDirectory}/wp-content/uploads && cp .htaccess-uploads /var/www/wordpress/${WPDirectory}/wp-content/uploads/.htaccess
+              command: !Sub mkdir -p "/var/www/wordpress/${WPDirectory}/wp-content/uploads" && cp .htaccess-uploads "/var/www/wordpress/${WPDirectory}/wp-content/uploads/.htaccess"
+              cwd: /tmp
+              ignoreErrors: false
+        install_opcache:
+          commands:
+            install_opcache:
+              command: ./install_opcache.sh
+              cwd: /tmp
+              ignoreErrors: false
+        install_wordpress:
+          commands:
+            install_wordpress:
+              command: ./install_wordpress.sh
               cwd: /tmp
               ignoreErrors: false
         install_wordpress_plugins:
@@ -1440,18 +1454,6 @@ Resources:
           commands:
             install_wordpress_initialization:
               command: ./install_wordpress_initialization.sh
-              cwd: /tmp
-              ignoreErrors: false
-        install_cacheclient:
-          commands:
-            install_cacheclient:
-              command: ./install_cacheclient.sh
-              cwd: /tmp
-              ignoreErrors: false
-        install_opcache:
-          commands:
-            install_opcache:
-              command: ./install_opcache.sh
               cwd: /tmp
               ignoreErrors: false
         start_webserver:
