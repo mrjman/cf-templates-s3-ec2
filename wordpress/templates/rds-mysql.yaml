@@ -219,12 +219,11 @@ Resources:
       BackupRetentionPeriod: !Ref BackupRetentionPeriod
       CopyTagsToSnapshot: true
       DBInstanceClass: !Ref DatabaseInstanceType
-      DBName: !Ref DatabaseName
+      DBName: !If [ NoSnapshot, !Ref DatabaseName, !Ref 'AWS::NoValue']
       DBSnapshotIdentifier: !If [ NoSnapshot, !Ref 'AWS::NoValue', !Ref DatabaseRestoreSnapshot]
       DBSubnetGroupName: !Ref DataSubnetGroup
       Engine: mysql
-      KmsKeyId:
-        !If [ UseAWS-ManagedCMK, !Ref 'AWS::NoValue', !Ref DatabaseCmk ]
+      KmsKeyId: !If [ UseAWS-ManagedCMK, !Ref 'AWS::NoValue', !Ref DatabaseCmk ]
       MasterUsername: !If [ NoSnapshot, !Ref DatabaseMasterUsername, !Ref 'AWS::NoValue']
       MasterUserPassword: !If [ NoSnapshot, !Ref DatabaseMasterPassword, !Ref 'AWS::NoValue']
       MultiAZ: !Ref MultiAZ
