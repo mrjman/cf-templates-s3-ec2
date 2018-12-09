@@ -48,12 +48,24 @@ Parameters:
     Type: String
 
 Resources:
-
-  RecordSet:
+  Route53HostedZone:
+    Type: AWS::Route53::HostedZone
+    Properties:
+      HostedZoneConfig:
+        Comment: !Sub "${WPDomainName} public DNS zone"
+      Name: !Sub ${WPDomainName}.
+  Route53RecordSet:
+    DependsOn: Route53HostedZone
     Type: AWS::Route53::RecordSetGroup
     Properties:
       HostedZoneName: !Sub ${WPDomainName}.
       RecordSets:
+        - Name: !Sub ${WPDomainName}.
+          Type: A
+          AliasTarget:
+            DNSName: !Ref DnsEndpoint
+            EvaluateTargetHealth: True
+            HostedZoneId: !Ref DnsHostId
         - Name: !Sub www.${WPDomainName}.
           Type: A
           AliasTarget:
