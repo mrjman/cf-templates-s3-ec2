@@ -1275,12 +1275,8 @@ Resources:
                         sed -i "/$table_prefix = 'wp_';/a define('WP_HOME', 'http://' . \$_SERVER['HTTP_HOST']);" "$directory/wp-config.php"
                         sed -i "/$table_prefix = 'wp_';/a define('WP_SITEURL', 'http://' . \$_SERVER['HTTP_HOST']);" "$directory/wp-config.php"
 
-                        # enable HTTPS in wp-config.php if ACM Public SSL Certificate parameter was not empty
-                        if [ "${HttpsEnabled}" = true ]; then
-                          sed -i "/$table_prefix = 'wp_';/a \$_SERVER['HTTPS'] = 'on';" "$directory/wp-config.php"
-                        else
-                          sed -i "/$table_prefix = 'wp_';/a # No ACM Public SSL Certificate" "$directory/wp-config.php"
-                        fi
+                        # set HTTPS based on HTTP_X_FORWARDED_PROTO header
+                        sed -i "/$table_prefix = 'wp_';/a if (strpos(\$_SERVER['HTTP_X_FORWARDED_PROTO'], 'https') !== false) {\n  \$_SERVER['HTTPS']='on';\\n}" "$directory/wp-config.php"
                       fi
 
                       RESULT=$?
@@ -1291,7 +1287,7 @@ Resources:
                         touch "$directory/wordpress.failed"
                       fi
                     fi
-                  - { DomainUrl: !If [ NoWPDomainName, !Ref PublicAlbHostname, !Join [ "", [ "'http://www.", !Ref WPDomainName, "'" ] ] ], HttpsEnabled: !If [ NoSslCertificate, false, true ] }
+                  - { DomainUrl: !If [ NoWPDomainName, !Ref PublicAlbHostname, !Join [ "", [ "'http://www.", !Ref WPDomainName, "'" ] ] ] }
               mode: 000500
               owner: root
               group: root
