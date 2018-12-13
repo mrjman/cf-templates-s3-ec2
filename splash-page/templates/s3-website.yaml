@@ -1,0 +1,111 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: Creates s3 bucket for static website hosting
+
+Metadata:
+  Author: Mondo Robot
+
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: General Parameters
+        Parameters:
+          - BucketName
+          - IndexDocument
+          - ErrorDocument
+      - Label:
+          default: Redirect Parameters
+        Parameters:
+          - RedirectConditionStatusCode
+          - RedirectHostName
+          - RedirectStatusCode
+    ParameterLabels:
+      BucketName:
+        default: Bucket Name
+      ErrorDocument:
+        default: Error Document Path (e.g. /404.html)
+      IndexDocument:
+        default: Index Document (e.g. index.html)
+      RedirectConditionStatusCode:
+        default: Redirect Condition Status Code
+      RedirectHostName:
+        default: Redirect Hostname
+      RedirectStatusCode:
+        default: Redirect Status Code
+Parameters:
+  BucketName:
+    Description: S3 bucket name to create for the website
+    Type: String
+  ErrorDocument:
+    Default: /404.html
+    Description: The error page for the website
+    Type: String
+  IndexDocument:
+    Default: index.html
+    Description: The index page for the website
+    Type: String
+  RedirectConditionStatusCode:
+    Default: 404
+    Description: The status code that will cause a redirect to occur
+    Type: String
+  RedirectHostName:
+    Default: ''
+    Description: The hostname to redirect to
+    Type: String
+  RedirectStatusCode:
+    AllowedValues: [301, 302, 303, 307]
+    Default: 302
+    Description: The status code to use on redirect
+    Type: String
+
+Conditions:
+  HasBucketName: !Not [ !Equals [ '', !Ref BucketName ] ]
+  HasErrorDocument: !Not [ !Equals [ '', !Ref ErrorDocument ] ]
+  HasRedirectRule: !Not [ !Equals [ '', !Ref RedirectHostName ] ]
+  HasRedirectCondition: !Not [ !Equals [ '', !Ref RedirectConditionStatusCode ] ]
+
+Resources:
+  WebsiteBucket:
+    DeletionPolicy: Retain
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !If [ HasBucketName, !Ref BucketName, !Ref 'AWS::NoValue' ]
+      Tags:
+        - Key: Name
+          Value: !Sub 'Web S3 / ${AWS::StackName}'
+      WebsiteConfiguration:
+        IndexDocument: !Ref IndexDocument
+        ErrorDocument: !If [ HasErrorDocument, !Ref ErrorDocument, !Ref 'AWS::NoValue' ]
+        RoutingRules:
+          - !If
+              - HasRedirectRule
+              -
+                RedirectRule:
+                  HostName: !Ref RedirectHostName
+                  HttpRedirectCode: !Ref RedirectStatusCode
+                RoutingRuleCondition:
+                  !If
+                    - HasRedirectCondition
+                    - HttpErrorCodeReturnedEquals: !Ref RedirectConditionStatusCode
+                    - !Ref 'AWS::NoValue'
+              - !Ref 'AWS::NoValue'
+  WebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebsiteBucket
+      PolicyDocument:
+        Statement:
+          - Action: 's3:GetObject'
+            Effect: Allow
+            Principal: '*'
+            Resource: !Sub 'arn:aws:s3:::${WebsiteBucket}/*'
+
+Outputs:
+  StackName:
+    Value: !Ref AWS::StackName
+  BucketName:
+    Value: !Ref WebsiteBucket
+  WebsiteURL:
+    Value: !GetAtt WebsiteBucket.WebsiteURL
+  DomainName:
+    Value: !GetAtt WebsiteBucket.DomainName

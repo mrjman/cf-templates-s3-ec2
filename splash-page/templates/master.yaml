@@ -1,0 +1,117 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: Master template for generating Coachella splash page resources
+
+Metadata:
+  Author: Mondo Robot
+
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: S3 General Parameters
+        Parameters:
+          - BucketName
+          - IndexDocument
+          - ErrorDocumentPath
+      - Label:
+          default: S3 Redirect Parameters
+        Parameters:
+          - RedirectConditionStatusCode
+          - RedirectHostName
+          - RedirectStatusCode
+      - Label:
+          default: CloudFront Parameters
+        Parameters:
+          - DomainName
+          - CertificateArn
+          - PriceClass
+    ParameterLabels:
+      BucketName:
+        default: Bucket Name
+      CertificateArn:
+        default: Certificate Arn
+      DomainName:
+        default: Domain Name
+      ErrorDocumentPath:
+        default: Error Document Path (i.e. /404.html)
+      IndexDocument:
+        default: Index document to serve when requesting folders (i.e. index.html)
+      PriceClass:
+        default: Price Class
+      RedirectConditionStatusCode:
+        default: Redirect Condition Status Code
+      RedirectHostName:
+        default: Redirect Hostname
+      RedirectStatusCode:
+        default: Redirect Status Code
+
+Parameters:
+  BucketName:
+    Description: Name to use for creation of the s3 bucket to hold the splash page
+    Type: String
+  CertificateArn:
+    Description: Amazon Resource Name (ARN) of an AWS Certificate Manager (ACM) certificate
+    Type: String
+  DomainName:
+    Description: The domain of your site
+    Type: String
+  ErrorDocumentPath:
+    Default: /404.html
+    Description: The path to the error document to serve when pages are not found
+    Type: String
+  IndexDocument:
+    Default: index.html
+    Description: The root document of directory
+    Type: String
+  PriceClass:
+    AllowedValues:
+      - PriceClass_100
+      - PriceClass_200
+      - PriceClass_All
+    Default: PriceClass_All
+    Description: The price class that corresponds to which edge servers are used
+    Type: String
+  RedirectConditionStatusCode:
+    Default: 404
+    Description: The status code that will cause a redirect to occur
+    Type: String
+  RedirectHostName:
+    Default: ''
+    Description: The hostname to redirect to
+    Type: String
+  RedirectStatusCode:
+    AllowedValues: [301, 302, 303, 307]
+    Default: 302
+    Description: The status code to use on redirect
+    Type: String
+
+Resources:
+  CloudFrontDistribution:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        CertificateArn: !Ref CertificateArn
+        DomainName: !Ref DomainName
+        PriceClass: !Ref PriceClass
+        S3WebsiteOriginDomain: !Select [ 2, !Split [ '/', !GetAtt S3Bucket.Outputs.WebsiteURL ] ]
+      TemplateURL: https://s3.amazonaws.com/cf-coachella/splash-page/cloudfront.yaml
+  S3Bucket:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      Parameters:
+        BucketName: !Ref BucketName
+        IndexDocument: !Ref IndexDocument
+        ErrorDocument: !Ref ErrorDocumentPath
+        RedirectConditionStatusCode: !Ref RedirectConditionStatusCode
+        RedirectHostName: !Ref RedirectHostName
+        RedirectStatusCode: !Ref RedirectStatusCode
+      TemplateURL: https://s3.amazonaws.com/cf-coachella/splash-page/s3-website.yaml
+
+Outputs:
+  BucketName:
+    Value: !GetAtt S3Bucket.Outputs.BucketName
+  DnsEndpoint:
+    Value: !GetAtt CloudFrontDistribution.Outputs.DnsEndpoint
+  DnsHostname:
+    Value: !GetAtt CloudFrontDistribution.Outputs.DnsHostname
