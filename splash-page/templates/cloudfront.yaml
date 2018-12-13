@@ -45,6 +45,7 @@ Resources:
       DistributionConfig:
         Aliases:
           - !If [ HasDomainName, !Ref DomainName, !Ref 'AWS::NoValue' ]
+        Comment: !Ref 'AWS::StackName'
         # CustomErrorResponses:
         #   - ErrorCode: 403 # not found
         #     ResponseCode: 404
