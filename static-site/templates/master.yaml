@@ -37,6 +37,13 @@ Metadata:
           - ApiArtistsUrl
           - ApiArtistMediaUrl
       - Label:
+          default: Basic Auth Parameters
+        Parameters:
+          - BasicAuthEnable
+          - BasicAuthUsername
+          - BasicAuthPassword
+          - BasicAuthLogsRetentionInDays
+      - Label:
           default: Lambda@Edge Parameters
         Parameters:
           - LambdaLogsRetentionInDays
@@ -70,6 +77,24 @@ Parameters:
   ApiPostsUrl:
     Description: Posts api url
     Type: String
+  BasicAuthUsername:
+    Default: admin
+    Description: The basic auth username
+    Type: String
+  BasicAuthPassword:
+    Description: The basic auth password
+    NoEcho: true
+    Type: String
+  BasicAuthEnable:
+    AllowedValues: [true, false]
+    Default: false
+    Description: Whether or not to use basic auth
+    Type: String
+  BasicAuthLogsRetentionInDays:
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653]
+    Default: 14
+    Description: 'Specifies the number of days you want to retain log events'
+    Type: Number
   BuildImage:
     Default: 'aws/codebuild/nodejs:10.1.0'
     Description: Build machine image
@@ -154,6 +179,7 @@ Parameters:
     Type: String
 
 Conditions:
+  HasBasicAuth: !Equals [ !Ref BasicAuthEnable, true ]
   HasDomain: !Not [ !Equals [ '', !Ref Domain ] ]
   HasSlackWebhook: !Not [ !Equals [ '', !Ref SlackWebhook ] ]
   NoPipelineBucket: !Equals [ '', !Ref PipelineBucket ]
@@ -186,6 +212,11 @@ Resources:
           LambdaFunctionAssociations:
             - EventType: 'origin-request'
               LambdaFunctionARN: !GetAtt Lambda.Outputs.VersionArn
+            - !If
+                - HasBasicAuth
+                - EventType: 'viewer-request'
+                  LambdaFunctionARN: !GetAtt LambdaBasicAuth.Outputs.VersionArn
+                - 'AWS::NoValue'
           MinTTL: 0
           TargetOriginId: s3origin
           ViewerProtocolPolicy: !If [ UseDefaultCert, 'allow-all', 'redirect-to-https']
@@ -441,6 +472,15 @@ Resources:
         LogsRetentionInDays: !Ref SlackNotifierLogsRetentionInDays
         SlackWebhook: !Ref SlackWebhook
       TemplateURL: https://s3.amazonaws.com/cf-coachella/static-site/lambda-pipeline-slack-notifier.yaml
+  LambdaBasicAuth:
+    Condition: HasBasicAuth
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      Parameters:
+        Username: !Ref BasicAuthUsername
+        Password: !Ref BasicAuthPassword
+        LogsRetentionInDays: !Ref BasicAuthLogsRetentionInDays
+      TemplateURL: https://s3.amazonaws.com/cf-coachella/static-site/lambda-basic-auth.yaml
   S3SiteBucket:
     Type: 'AWS::S3::Bucket'
     Properties:
