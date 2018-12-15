@@ -23,7 +23,7 @@ Metadata:
       BucketName:
         default: Bucket Name
       ErrorDocument:
-        default: Error Document Path (e.g. /404.html)
+        default: Error Document Path (e.g. 404.html)
       IndexDocument:
         default: Index Document (e.g. index.html)
       RedirectConditionStatusCode:
@@ -37,7 +37,7 @@ Parameters:
     Description: S3 bucket name to create for the website
     Type: String
   ErrorDocument:
-    Default: /404.html
+    Default: 404.html
     Description: The error page for the website
     Type: String
   IndexDocument:
@@ -45,7 +45,7 @@ Parameters:
     Description: The index page for the website
     Type: String
   RedirectConditionStatusCode:
-    Default: 404
+    Default: ''
     Description: The status code that will cause a redirect to occur
     Type: String
   RedirectHostName:
@@ -103,6 +103,8 @@ Resources:
 Outputs:
   StackName:
     Value: !Ref AWS::StackName
+  Arn:
+    Value: !GetAtt WebsiteBucket.Arn
   BucketName:
     Value: !Ref WebsiteBucket
   WebsiteURL:

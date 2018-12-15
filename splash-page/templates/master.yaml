@@ -13,7 +13,7 @@ Metadata:
         Parameters:
           - BucketName
           - IndexDocument
-          - ErrorDocumentPath
+          - ErrorDocument
       - Label:
           default: S3 Redirect Parameters
         Parameters:
@@ -26,6 +26,7 @@ Metadata:
           - DomainName
           - CertificateArn
           - PriceClass
+          - SecurityHeadersEnable
     ParameterLabels:
       BucketName:
         default: Bucket Name
@@ -33,8 +34,8 @@ Metadata:
         default: Certificate Arn
       DomainName:
         default: Domain Name
-      ErrorDocumentPath:
-        default: Error Document Path (i.e. /404.html)
+      ErrorDocument:
+        default: Error Document Path (i.e. 404.html)
       IndexDocument:
         default: Index document to serve when requesting folders (i.e. index.html)
       PriceClass:
@@ -45,6 +46,8 @@ Metadata:
         default: Redirect Hostname
       RedirectStatusCode:
         default: Redirect Status Code
+      SecurityHeadersEnable:
+        default: Enable security headers in responses from CloudFront to user
 
 Parameters:
   BucketName:
@@ -56,8 +59,8 @@ Parameters:
   DomainName:
     Description: The domain of your site
     Type: String
-  ErrorDocumentPath:
-    Default: /404.html
+  ErrorDocument:
+    Default: 404.html
     Description: The path to the error document to serve when pages are not found
     Type: String
   IndexDocument:
@@ -85,6 +88,14 @@ Parameters:
     Default: 302
     Description: The status code to use on redirect
     Type: String
+  SecurityHeadersEnable:
+    AllowedValues: [true, false]
+    Default: true
+    Description: Enables security headers in the response from CloudFront to users
+    Type: String
+
+Conditions:
+  HasSecurityHeaders: !Equals [ !Ref SecurityHeadersEnable, true ]
 
 Resources:
   CloudFrontDistribution:
@@ -95,14 +106,20 @@ Resources:
         DomainName: !Ref DomainName
         PriceClass: !Ref PriceClass
         S3WebsiteOriginDomain: !Select [ 2, !Split [ '/', !GetAtt S3Bucket.Outputs.WebsiteURL ] ]
+        SecurityHeadersLambdaVersionArn: !If [ HasSecurityHeaders, !GetAtt LambdaSecurityHeadersModule.Outputs.VersionArn, !Ref 'AWS::NoValue' ]
       TemplateURL: https://s3.amazonaws.com/cf-coachella/splash-page/cloudfront.yaml
+  LambdaSecurityHeadersModule:
+    Condition: HasSecurityHeaders
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/cf-coachella/splash-page/lambda-security-headers.yaml
   S3Bucket:
     Type: AWS::CloudFormation::Stack
     Properties:
       Parameters:
         BucketName: !Ref BucketName
         IndexDocument: !Ref IndexDocument
-        ErrorDocument: !Ref ErrorDocumentPath
+        ErrorDocument: !Ref ErrorDocument
         RedirectConditionStatusCode: !Ref RedirectConditionStatusCode
         RedirectHostName: !Ref RedirectHostName
         RedirectStatusCode: !Ref RedirectStatusCode

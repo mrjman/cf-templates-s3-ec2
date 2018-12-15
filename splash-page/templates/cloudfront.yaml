@@ -9,12 +9,16 @@ Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label:
-          default: CloudFront Paramters
+          default: CloudFront Parameters
         Parameters:
           - DomainName
           - S3WebsiteOriginDomain
           - CertificateArn
           - PriceClass
+      - Label:
+          default: Lambda Associations
+        Parameters:
+          - SecurityHeadersLambdaVersionArn
 Parameters:
   CertificateArn:
     Description: Amazon Resource Name (ARN) of an AWS Certificate Manager (ACM) certificate
@@ -33,9 +37,14 @@ Parameters:
     Default: PriceClass_All
     Description: The price class that corresponds to which edge servers are used
     Type: String
+  SecurityHeadersLambdaVersionArn:
+    Default: ''
+    Description: Amazon Resource Name (ARN) of the Lambda function version implementing security headers
+    Type: String
 
 Conditions:
   HasDomainName: !Not [ !Equals [ '', !Ref DomainName ] ]
+  HasSecurityHeaders: !Not [ !Equals [ '', !Ref SecurityHeadersLambdaVersionArn ] ]
   UseDefaultCert: !Equals [ '', !Ref CertificateArn ]
 
 Resources:
@@ -46,10 +55,6 @@ Resources:
         Aliases:
           - !If [ HasDomainName, !Ref DomainName, !Ref 'AWS::NoValue' ]
         Comment: !Ref 'AWS::StackName'
-        # CustomErrorResponses:
-        #   - ErrorCode: 403 # not found
-        #     ResponseCode: 404
-        #     ResponsePagePath: !Ref ErrorDocumentPath
         DefaultCacheBehavior:
           AllowedMethods: [GET, HEAD, OPTIONS]
           CachedMethods: [GET, HEAD, OPTIONS]
@@ -58,6 +63,12 @@ Resources:
             Cookies:
               Forward: none
             QueryString: false
+          LambdaFunctionAssociations:
+            - !If
+                - HasSecurityHeaders
+                - EventType: 'origin-response'
+                  LambdaFunctionARN: !Ref SecurityHeadersLambdaVersionArn
+                - !Ref 'AWS::NoValue'
           MinTTL: 0
           TargetOriginId: s3origin
           ViewerProtocolPolicy: !If [ UseDefaultCert, 'allow-all', 'redirect-to-https']
