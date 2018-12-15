@@ -1,5 +1,11 @@
 AWSTemplateFormatVersion: 2010-09-09
 
+Description: >
+  Lambda@Edge function to implement clean urls on static sites hosted through CloudFront.
+  This function is needed when using CloudFront as an origin access identity and S3 bucket
+  not configured as a website bucket. If S3 is setup as website bucket clean urls are
+  already implemented by setting the index document on the bucket properties.
+  
 Metadata:
   Author: Mondo Robot
 

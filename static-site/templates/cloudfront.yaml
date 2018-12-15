@@ -1,0 +1,120 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: Creates CloudFront distribution for Coachella static website resources
+
+Metadata:
+  Author: Mondo Robot
+
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: CloudFront Parameters
+        Parameters:
+          - DomainName
+          - S3WebsiteOriginDomain
+          - ErrorDocumentPath
+          - CertificateArn
+          - PriceClass
+      - Label:
+          default: Lambda Associations
+        Parameters:
+          - BasicAuthLambdaVersionArn
+          - SecurityHeadersLambdaVersionArn
+
+Parameters:
+  BasicAuthLambdaVersionArn:
+    Default: ''
+    Description: Amazon Resource Name (ARN) of the Lambda function version implementing basic auth
+    Type: String
+  CertificateArn:
+    Description: Amazon Resource Name (ARN) of an AWS Certificate Manager (ACM) certificate
+    Type: String
+  DomainName:
+    Description: The domain of your site
+    Type: String
+  ErrorDocumentPath:
+    Default: /404.html
+    Description: The error document to load when pages not found
+    Type: String
+  S3WebsiteOriginDomain:
+    Description: The S3 website URL endpoint to use for the origin
+    Type: String
+  PriceClass:
+    AllowedValues:
+      - PriceClass_100
+      - PriceClass_200
+      - PriceClass_All
+    Default: PriceClass_All
+    Description: The price class that corresponds to which edge servers are used
+    Type: String
+  SecurityHeadersLambdaVersionArn:
+    Default: ''
+    Description: Amazon Resource Name (ARN) of the Lambda function version implementing security headers
+    Type: String
+
+
+Conditions:
+  HasBasicAuth: !Not [ !Equals [ '', !Ref BasicAuthLambdaVersionArn ] ]
+  HasDomainName: !Not [ !Equals [ '', !Ref DomainName ] ]
+  HasSecurityHeaders: !Not [ !Equals [ '', !Ref SecurityHeadersLambdaVersionArn ] ]
+  UseDefaultCert: !Equals [ '', !Ref CertificateArn ]
+
+Resources:
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Aliases:
+          - !If [ HasDomainName, !Ref DomainName, !Ref 'AWS::NoValue' ]
+        Comment: !Ref 'AWS::StackName'
+        CustomErrorResponses:
+          - ErrorCachingMinTTL: 30
+            ErrorCode: 403 # not found
+            ResponseCode: 404
+            ResponsePagePath: !Ref ErrorDocumentPath
+        DefaultCacheBehavior:
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD, OPTIONS]
+          Compress: true
+          DefaultTTL: 0
+          ForwardedValues:
+            Cookies:
+              Forward: none
+            QueryString: false
+          LambdaFunctionAssociations:
+            - !If
+                - HasBasicAuth
+                - EventType: 'viewer-request'
+                  LambdaFunctionARN: !Ref BasicAuthLambdaVersionArn
+                - !Ref 'AWS::NoValue'
+            - !If
+                - HasSecurityHeaders
+                - EventType: 'origin-response'
+                  LambdaFunctionARN: !Ref SecurityHeadersLambdaVersionArn
+                - !Ref 'AWS::NoValue'
+          MinTTL: 0
+          TargetOriginId: s3origin
+          ViewerProtocolPolicy: !If [ UseDefaultCert, 'allow-all', 'redirect-to-https']
+        Enabled: true
+        HttpVersion: http2
+        Origins:
+          - DomainName: !Ref S3WebsiteOriginDomain
+            Id: s3origin
+            CustomOriginConfig:
+              OriginProtocolPolicy: http-only
+        PriceClass: !Ref PriceClass
+        ViewerCertificate:
+          AcmCertificateArn: !If [ UseDefaultCert, !Ref 'AWS::NoValue', !Ref CertificateArn ]
+          CloudFrontDefaultCertificate: !If [ UseDefaultCert, true, !Ref 'AWS::NoValue' ]
+          SslSupportMethod: !If [ UseDefaultCert, !Ref 'AWS::NoValue', 'sni-only' ]
+
+Outputs:
+  StackName:
+    Value: !Ref AWS::StackName
+  Id:
+    Value: !Ref CloudFrontDistribution
+  DnsEndpoint:
+    Value: !If [ HasDomainName, !Ref DomainName, !GetAtt CloudFrontDistribution.DomainName ]
+  DnsHostname:
+    Value: !If [ HasDomainName, !Sub 'https://${DomainName}', !Sub 'https://${CloudFrontDistribution.DomainName}' ]

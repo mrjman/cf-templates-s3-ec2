@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: 2010-09-09
 
-Description: Lambda@Edge function to implement Basic Authentication on sites hosted through CloudFront
+Description: Lambda@Edge function to add security headers to responses from CloudFront
 
 Metadata:
   Author: Mondo Robot
@@ -10,8 +10,6 @@ Metadata:
       - Label:
           default: Lambda Parameters
         Parameters:
-          - Username
-          - Password
           - Runtime
           - Timeout
           - MemorySize
@@ -23,12 +21,12 @@ Metadata:
 
 Parameters:
   FunctionDescription:
-    Default: Implements basic authentication
+    Default: Adds security headers to response
     Description: The description of the lambda function
     Type: String
   LogsRetentionInDays:
     AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653]
-    Default: 14
+    Default: 7
     Description: 'Specifies the number of days you want to retain log events'
     Type: Number
   MemorySize:
@@ -36,10 +34,6 @@ Parameters:
     Default: 128
     Description: The memory size to use
     Type: Number
-  Password:
-    Description: The basic auth password
-    NoEcho: true
-    Type: String
   Runtime:
     AllowedValues:
       - nodejs
@@ -53,10 +47,6 @@ Parameters:
     Default: 5
     Description: Lambda function execution time in seconds before terminating
     Type: Number
-  Username:
-    Default: admin
-    Description: The basic auth username
-    Type: String
 
 Conditions:
   HasFunctionDescription: !Not [ !Equals [ '', !Ref FunctionDescription ] ]
@@ -67,31 +57,46 @@ Resources:
     Properties:
       Code:
         # If you change the ZipFile, rename the logical id LambdaVersionV1 to trigger a new version creation!
-        ZipFile:  !Sub |
+        ZipFile: !Sub |
           'use strict';
 
-          const authString = 'Basic ' + new Buffer('${Username}' + ':' + '${Password}').toString('base64');
-
           exports.handler = (event, context, callback) => {
-            const request = event.Records[0].cf.request;
-            const headers = request.headers;
+            const response = event.Records[0].cf.response;
+            const headers = response.headers;
 
-            // If basic auth header does not match, send WWW-Authenticate response
-            if (typeof headers.authorization == 'undefined' || headers.authorization[0].value != authString) {
-              const body = 'Unauthorized';
-              const response = {
-                status: '401',
-                statusDescription: 'Unauthorized',
-                body: body,
-                headers: {
-                  'www-authenticate': [{key: 'WWW-Authenticate', value:'Basic realm="Site access"'}]
-                },
-              };
-              callback(null, response);
-            }
+            // add security headers
+            headers['strict-transport-security'] = [
+              {
+                key: 'Strict-Transport-Security',
+                value: 'max-age=31536000; includeSubdomains; preload'
+              }
+            ];
+            headers['x-content-type-options'] = [
+              {
+                key: 'X-Content-Type-Options',
+                value: 'nosniff'
+              }
+            ];
+            headers['x-frame-options'] = [
+              {
+                key: 'X-Frame-Options',
+                value: 'SAMEORIGIN'
+              }
+            ];
+            headers['x-xss-protection'] = [
+              {
+                key: 'X-XSS-Protection',
+                value: '1; mode=block'
+              }
+            ];
+            headers['referrer-policy'] = [
+              {
+                key: 'Referrer-Policy',
+                value: 'no-referrer-when-downgrade'
+              }
+            ];
 
-            // Continue request processing if authentication passed
-            callback(null, request);
+            callback(null, response);
           };
       Description: !If [ HasFunctionDescription, !Ref FunctionDescription, !Ref 'AWS::NoValue' ]
       Handler: 'index.handler'

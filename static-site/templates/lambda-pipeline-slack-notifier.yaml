@@ -1,8 +1,7 @@
 ---
 AWSTemplateFormatVersion: "2010-09-09"
 
-Description: >
-  Creates Lambda and Cloudwatch rule to send slack notification for code pipeline events
+Description: Creates Lambda and Cloudwatch rule to send slack notification for code pipeline events
 
 Metadata:
   Authors:
