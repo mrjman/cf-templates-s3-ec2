@@ -1,20 +1,14 @@
 ---
 AWSTemplateFormatVersion: 2010-09-09
 
-Description: Reference Architecture to host WordPress on AWS - Creates WordPress web Auto Scaling group
+Description: >
+  Creates an autoscaling group for web instances meant to run wordpress sitting
+  behind a load balancer. Optionally allows an EFS file system to be attached
+  for shared resources. Inspired from the wordpress reference architecture
+  https://github.com/aws-samples/aws-refarch-wordpress.
 
 Metadata:
-
-  Authors:
-    Description: Darryl Osborne (darrylo@amazon.com)
-  License:
-    Description: 'Copyright 2018 Amazon.com, Inc. and its affiliates. All Rights Reserved.
-      Licensed under the Amazon Software License (the "License"). You may not use this file
-      except in compliance with the License. A copy of the License is located at
-      http://aws.amazon.com/asl/
-      or in the "license" file accompanying this file. This file is distributed on an "AS IS"
-      BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-      License for the specific language governing permissions and limitations under the License.'
+  Author: Mondo Robot
 
   AWS::CloudFormation::Interface:
     ParameterGroups:
@@ -22,7 +16,6 @@ Metadata:
           default: Web Parameters
         Parameters:
           - PHPVersion
-          - PHPIniOverride
           - EC2KeyName
           - LatestAmiId
           - WebInstanceType
@@ -33,72 +26,25 @@ Metadata:
           - Subnet
           - PublicAlbTargetGroupArn
           - PublicAlbHostname
-          - SslCertificate
-      - Label:
-          default: WordPress Parameters
-        Parameters:
-          - WPVersion
-          - WPTitle
-          - WPDomainName
-          - WPDirectory
-          - WPAdminUsername
-          - WPAdminPassword
-          - WPAdminEmail
-          - WPLocale
-          - WPACFProKey
-      - Label:
-          default: Database Parameters
-        Parameters:
-          - DatabaseClusterEndpointAddress
-          - DatabaseName
-          - DatabaseMasterUsername
-          - DatabaseMasterPassword
-      - Label:
-          default: Media Parameters
-        Parameters:
-          - MediaUploadBucket
-          - MediaUploadAccessKeyId
-          - MediaUploadAccessKeySecret
-          - CdnUrl
       - Label:
           default: File System Parameters
         Parameters:
           - ElasticFileSystem
     ParameterLabels:
-      CdnUrl:
-        default: CDN URL
-      DatabaseClusterEndpointAddress:
-        default: DB Cluster Endpoint Address
-      DatabaseMasterUsername:
-        default: DB Master Username
-      DatabaseMasterPassword:
-        default: DB Master Password
-      DatabaseName:
-        default: DB Name
       ElasticFileSystem:
         default: EFS File System
       EC2KeyName:
         default: Existing Key Pair
       LatestAmiId:
         default: Latest AMI Id
-      MediaUploadAccessKeyId:
-        default: Media Upload Access Key Id
-      MediaUploadAccessKeySecret:
-        default: Media Upload Access Key Secret
-      MediaUploadBucket:
-        default: Media Upload S3 Bucket
       NumberOfSubnets:
         default: Number of subnets
-      PHPIniOverride:
-        default: AWS php.ini Overrides
       PHPVersion:
         default: PHP Version
       PublicAlbTargetGroupArn:
         default: Public Alb Target Group Arn
       PublicAlbHostname:
         default: Public Alb Hostname
-      SslCertificate:
-        default: ACM Cert attached to Public Alb
       Subnet:
         default: Subnets
       WebAsgMax:
@@ -109,52 +55,8 @@ Metadata:
         default: Web Instance Type
       WebSecurityGroup:
         default: Web Security Group
-      WPACFProKey:
-        default: '[Optional] ACF Pro key'
-      WPAdminEmail:
-        default: Admin Email
-      WPAdminPassword:
-        default: Admin Password
-      WPAdminUsername:
-        default: Admin Username
-      WPDirectory:
-        default: Site Directory
-      WPDomainName:
-        default: Site Domain
-      WPLocale:
-        default: Language Code
-      WPTitle:
-        default: Site Title
-      WPVersion:
-        default: WordPress Version
 
 Parameters:
-  CdnUrl:
-    Default: ''
-    Description: '[Optional] Url for CDN assets hosting'
-    Type: String
-  DatabaseClusterEndpointAddress:
-    Description: The RDS cluster endpoint address.
-    Type: String
-  DatabaseMasterUsername:
-    AllowedPattern: ^([a-zA-Z0-9]*)$
-    Description: The Amazon RDS master username.
-    ConstraintDescription: Must contain only alphanumeric characters and be at least 8 characters.
-    MaxLength: 16
-    MinLength: 1
-    Type: String
-  DatabaseMasterPassword:
-    AllowedPattern: ^([a-z0-9A-Z`~!#$%^&*()_+,\\-])*$
-    ConstraintDescription: Must be letters (upper or lower), numbers, and these special characters '_'`~!#$%^&*()_+,-
-    Description: The Amazon RDS master password.
-    MaxLength: 41
-    MinLength: 8
-    NoEcho: true
-    Type: String
-  DatabaseName:
-    AllowedPattern: ^([a-zA-Z0-9]*)$
-    Description: The Amazon RDS master database name.
-    Type: String
   ElasticFileSystem:
     Default: ''
     Description: The Amazon EFS file system id.
@@ -168,23 +70,10 @@ Parameters:
     Default: /aws/service/ami-amazon-linux-latest/amzn-ami-hvm-x86_64-gp2
     Description: Specifies the AMI to use. Defaults to 64-bit Amazon Linux 1 (don't use 2)
     Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
-  MediaUploadAccessKeyId:
-    Description: Access Key Id of the user account that allows media uploads from wordpress
-    Type: String
-  MediaUploadAccessKeySecret:
-    Description: Access Key Secret of the user account that allows media uploads from wordpress
-    NoEcho: true
-    Type: String
-  MediaUploadBucket:
-    Description: The s3 bucket where media assets are uploaded
-    Type: String
   NumberOfSubnets:
     AllowedValues: [2, 3, 4, 5, 6]
     Default: 2
     Description: Number of subnets. This must match your selections in the list of subnets below.
-    Type: String
-  PHPIniOverride:
-    Description: Full Amazon S3 https path to a php.ini override file (e.g. https://s3.amazonaws.com/cf-coachella/wordpress/config-files/20-aws.ini)
     Type: String
   PHPVersion:
     AllowedValues: [7.0]
@@ -197,12 +86,6 @@ Parameters:
   PublicAlbHostname:
     Description: The hostname of the public ALB http form (e.g. http://abdc-12345-xyz.<region>.elb.amazonaws.com)
     Type: String
-  SslCertificate:
-    AllowedValues: [true, false]
-    Default: False
-    Description: Is there an ACM SSL Certificate attached to the Public Alb?
-    Type:
-      String
   Subnet:
     Description: Select existing subnets. The number selected must match the number of subnets above. Subnets selected must be in separate AZs.
     Type: List<AWS::EC2::Subnet::Id>
@@ -323,59 +206,8 @@ Parameters:
   WebSecurityGroup:
     Description: Select the web security group.
     Type: AWS::EC2::SecurityGroup::Id
-  WPACFProKey:
-    Default: ''
-    Description: Advanced Custom Fields Pro key
-    NoEcho: true
-    Type: String
-  WPAdminEmail:
-    AllowedPattern: ^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$
-    Description: The WordPress admin email address.
-    Type: String
-  WPAdminPassword:
-    AllowedPattern: ^([a-zA-Z0-9`~!#$%^&*()_+,\\-])*$
-    ConstraintDescription: Must be letters (upper or lower), numbers, and these special characters '_'`~!#$%^&*()_+,-
-    Description: The WordPress admin password.
-    Type: String
-    NoEcho: true
-  WPAdminUsername:
-    AllowedPattern: ^([a-zA-Z0-9])([a-zA-Z0-9_-])*([a-zA-Z0-9])$
-    Description: The WordPress admin username.
-    Type: String
-  WPDirectory:
-    AllowedPattern: ^([a-zA-Z0-9])([a-zA-Z0-9_-])*([a-zA-Z0-9])$
-    Description: The WordPress site directory.
-    Type: String
-  WPDomainName:
-    AllowedPattern: ^$|(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$
-    Description: '[ Optional ] The main domain name of the WordPress site (e.g. example.com). Leave empty to use the ALB DNS name for the WordPress site.'
-    Type: String
-  WPLocale:
-    Description: The main language of the WordPress site, as per https://codex.WordPress.org/Installing_WordPress_in_Your_Language. The default is 'en_US'.
-    Type: String
-    Default: en_US
-  WPTitle:
-    AllowedPattern: ^([a-zA-Z0-9])([a-zA-Z0-9 _-]*)([a-zA-Z0-9])$
-    Description: The WordPress website title.
-    Type: String
-  WPVersion:
-    AllowedValues:
-      - latest
-      - nightly
-      - 4.5.3
-      - 4.6.1
-      - 4.7.4
-      - 4.8.2
-      - 4.9.8
-      - 5.0
-    Default: 4.9.8
-    Description: The WordPress version (make sure this version is compatible with the PHP version selected above).
-    Type: String
 
 Conditions:
-
-  NoSslCertificate:
-    !Equals [ False, !Ref SslCertificate ]
   NumberOfSubnets1:
     !Equals [ 1, !Ref NumberOfSubnets ]
   NumberOfSubnets2:
@@ -390,8 +222,6 @@ Conditions:
     !Equals [ 6, !Ref NumberOfSubnets ]
   PHP70:
     !Equals [ 7.0, !Ref PHPVersion ]
-  NoWPDomainName:
-    !Equals [ '', !Ref WPDomainName ]
 
 Resources:
   WebInstanceProfile:
@@ -426,7 +256,7 @@ Resources:
                   - logs:DescribeLogStreams
                 Resource:
                   - arn:aws:logs:*:*:*
-        - PolicyName: cf-s3-access
+        - PolicyName: cfn-s3-access
           PolicyDocument:
             Version: 2012-10-17
             Statement:
@@ -435,6 +265,42 @@ Resources:
                   - 's3:GetObject'
                 Resource:
                   - 'arn:aws:s3:::cf-coachella/*'
+        - PolicyName: parameter-store-access
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ssm:Describe*'
+                  - 'ssm:Get*'
+                  - 'ssm:List*'
+                Resource: '*'
+        - PolicyName: codedeploy-access
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:Get*'
+                  - 's3:List*'
+                Resource: '*'
+                  # TODO: Limit to only required resources
+                  # - !Sub '${CodePipelineBucketArn}/*'
+                  # - 'arn:aws:s3:::aws-codedeploy-us-east-2/*'
+                  # - 'arn:aws:s3:::aws-codedeploy-us-east-1/*'
+                  # - 'arn:aws:s3:::aws-codedeploy-us-west-1/*'
+                  # - 'arn:aws:s3:::aws-codedeploy-us-west-2/*'
+                  # - 'arn:aws:s3:::aws-codedeploy-ca-central-1/*'
+                  # - 'arn:aws:s3:::aws-codedeploy-eu-west-1/*'
+                  # - 'arn:aws:s3:::aws-codedeploy-eu-west-2/*'
+                  # - 'arn:aws:s3:::aws-codedeploy-eu-west-3/*'
+                  # - 'arn:aws:s3:::aws-codedeploy-eu-central-1/*'
+                  # - 'arn:aws:s3:::aws-codedeploy-ap-northeast-1/*'
+                  # - 'arn:aws:s3:::aws-codedeploy-ap-northeast-2/*'
+                  # - 'arn:aws:s3:::aws-codedeploy-ap-southeast-1/*'
+                  # - 'arn:aws:s3:::aws-codedeploy-ap-southeast-2/*'
+                  # - 'arn:aws:s3:::aws-codedeploy-ap-south-1/*'
+                  # - 'arn:aws:s3:::aws-codedeploy-sa-east-1/*'
   WebAutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
@@ -490,19 +356,10 @@ Resources:
         configSets:
           deploy_webserver:
             - install_webserver
-            - build_cacheclient
-            - build_wordpress
-            - build_wordpress_plugins
-            - build_wordpress_initialization
-            - build_opcache
             - install_aws_ini
             - install_cacheclient
-            - install_wordpress
-            - install_htaccess
-            - install_wordpress_plugins
             - install_opcache
-            - install_wordpress_initialization
-            - start_webserver
+            - install_codedeploy_agent
         install_webserver:
           packages:
             yum:
@@ -513,35 +370,33 @@ Resources:
               php70-mysqlnd: []
               php70-pecl-imagick: []
               php70-pecl-memcache: []
+        install_aws_ini:
           files:
-            /tmp/create_site_conf.sh:
+            /tmp/install_ini_override.sh:
               content:
                 !Sub |
                   #!/bin/bash -xe
-                  conf_file="/etc/httpd/conf.d/${WPDirectory}.conf"
-                  directory="/var/www/wordpress/${WPDirectory}"
+                  ini_override_file="/etc/php-7.0.d/20-aws.ini"
 
-                  if [ ! -f "$conf_file" ]; then
-                     touch "$conf_file"
-                     echo "ServerSignature Off" >> "$conf_file"
-                     echo "ServerTokens Prod" >> "$conf_file"
-                     echo "ServerName 127.0.0.1:80" >> "$conf_file"
-                     echo "DocumentRoot $directory" >> "$conf_file"
-                     echo "<Directory $directory>" >> "$conf_file"
-                     echo "  Options Indexes FollowSymLinks" >> "$conf_file"
-                     echo "  AllowOverride All" >> "$conf_file"
-                     echo "  Require all granted" >> "$conf_file"
-                     echo "</Directory>" >> "$conf_file"
+                  if [ ! -f "$ini_override_file" ]; then
+                    echo "; Enable php.ini overrides for hosting WordPress on AWS" >> "$ini_override_file"
+                    echo "memory_limit = 512M" >> "$ini_override_file"
+                    echo "post_max_size = 200M" >> "$ini_override_file"
+                    echo "upload_max_filesize = 200M" >> "$ini_override_file"
+                    echo "max_input_time = 300" >> "$ini_override_file"
+                    echo "max_execution_time = 300" >> "$ini_override_file"
+                    echo "max_file_uploads = 200" >> "$ini_override_file"
+                    echo "max_input_vars = 10000" >> "$ini_override_file"
                   fi
               mode: 000500
               owner: root
               group: root
           commands:
-            create_site_conf:
-              command: ./create_site_conf.sh
+            install_aws_ini:
+              command: ./install_ini_override.sh
               cwd: /tmp
-              ignoreErrors: false
-        build_cacheclient:
+              ignoreErrors: true
+        install_cacheclient:
           packages:
             yum:
               gcc-c++: []
@@ -561,7 +416,12 @@ Resources:
               group: root
           sources:
             /tmp: https://s3.amazonaws.com/cf-coachella/wordpress/config-files/AmazonElastiCacheClusterClient-2.0.1-PHP70-64bit.tar.gz
-        build_opcache:
+          commands:
+            install_cacheclient:
+              command: ./install_cacheclient.sh
+              cwd: /tmp
+              ignoreErrors: false
+        install_opcache:
           packages:
             yum:
               php70-opcache: []
@@ -578,11 +438,6 @@ Resources:
                   # enable opcache in /etc/php-7.0.d/10-opcache.ini
                   sed -i 's/;opcache.file_cache=.*/opcache.file_cache=\/var\/www\/.opcache/' /etc/php-7.0.d/10-opcache.ini
                   sed -i 's/opcache.memory_consumption=.*/opcache.memory_consumption=512/' /etc/php-7.0.d/10-opcache.ini
-
-                  # download opcache-instance.php to verify opcache status
-                  if [ ! -f "/var/www/wordpress/${WPDirectory}/opcache-instanceid.php" ]; then
-                    mv "/tmp/opcache-instanceid.php" "/var/www/wordpress/${WPDirectory}/"
-                  fi
               mode: 000500
               owner: root
               group: root
@@ -591,224 +446,35 @@ Resources:
               mode: 000500
               owner: root
               group: root
-        build_wordpress:
-          files:
-            /tmp/install_wordpress.sh:
-              content:
-                !Sub
-                  - |
-                    #!/bin/bash -xe
-
-                    # install wp-cli
-                    if [ ! -f "/bin/wp/wp-cli.phar" ]; then
-                      curl -o "/bin/wp" "https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar"
-                      chmod +x "/bin/wp"
-                    fi
-
-                    wp_cli_config="/var/www/wordpress/wp-cli.yml"
-                    if [ ! -f "$wp_cli_config" ]; then
-                      echo "apache_modules: [mod_rewrite]" >> "$wp_cli_config"
-                    fi
-
-                    directory="/var/www/wordpress/${WPDirectory}"
-
-                    # make site directory
-                    if [ ! -d "$directory" ]; then
-                      mkdir -p "$directory" && cd "$directory"
-
-                      # install wordpress if not installed
-                      # use public alb host name if wp domain name was empty
-                      if ! $(wp core is-installed --allow-root); then
-                        wp core download --version="${WPVersion}" --locale="${WPLocale}" --allow-root
-                        wp core config --dbname="${DatabaseName}" --dbuser="${DatabaseMasterUsername}" --dbpass="${DatabaseMasterPassword}" --dbhost="${DatabaseClusterEndpointAddress}" --dbprefix="wp_" --allow-root
-                        wp core install --url="${DomainUrl}" --title="${WPTitle}" --admin_user="${WPAdminUsername}" --admin_password="${WPAdminPassword}" --admin_email="${WPAdminEmail}" --skip-email --allow-root
-
-                        sed -i "/$table_prefix = 'wp_';/a define('WP_HOME', 'http://' . \$_SERVER['HTTP_HOST']);" "$directory/wp-config.php"
-                        sed -i "/$table_prefix = 'wp_';/a define('WP_SITEURL', 'http://' . \$_SERVER['HTTP_HOST']);" "$directory/wp-config.php"
-
-                        # set HTTPS based on HTTP_X_FORWARDED_PROTO header
-                        sed -i "/$table_prefix = 'wp_';/a if (strpos(\$_SERVER['HTTP_X_FORWARDED_PROTO'], 'https') !== false) {\n  \$_SERVER['HTTPS']='on';\\n}" "$directory/wp-config.php"
-                      fi
-
-                      RESULT=$?
-
-                      if [ $RESULT -eq 0 ]; then
-                        touch "$directory/wordpress.initialized"
-                      else
-                        touch "$directory/wordpress.failed"
-                      fi
-                    fi
-                  - { DomainUrl: !If [ NoWPDomainName, !Ref PublicAlbHostname, !Join [ "", [ "'http://www.", !Ref WPDomainName, "'" ] ] ] }
-              mode: 000500
-              owner: root
-              group: root
-        build_wordpress_plugins:
-          files:
-            /tmp/install_wordpress_plugins.sh:
-              content:
-                !Sub |
-                  #!/bin/bash -xe
-                  cd /var/www/wordpress/${WPDirectory}
-
-                  # install acf pro plugin if supplied
-                  if [ -n "${WPACFProKey}" ]; then
-                    if ! $(wp plugin is-installed advanced-custom-fields-pro --allow-root); then
-                        # zip file location
-                        acf_zip_file="$(wp plugin path --allow-root)/acf-pro.zip"
-
-                        # get acf pro zip file
-                        wget -O $acf_zip_file "http://connect.advancedcustomfields.com/index.php?p=pro&a=download&k=${WPACFProKey}"
-
-                        # install & activate acf pro
-                        wp plugin install $acf_zip_file --activate --allow-root
-
-                        # remove zip file
-                        rm $acf_zip_file
-                    fi
-                  elif ! $(wp plugin is-installed advanced-custom-fields --allow-root); then
-                    wp plugin install advanced-custom-fields --activate --allow-root
-                  fi
-
-                  # install media cloud plugin
-                  if ! $(wp plugin is-installed ilab-media-tools --allow-root); then
-                      wp plugin install ilab-media-tools --activate --allow-root
-                  fi
-
-                  # install acf to rest api plugin
-                  if ! $(wp plugin is-installed acf-to-rest-api --allow-root); then
-                      wp plugin install acf-to-rest-api --activate --allow-root
-                  fi
-
-                  # install wp api menus plugin
-                  if ! $(wp plugin is-installed wp-api-menus --allow-root); then
-                      wp plugin install wp-api-menus --activate --allow-root
-                  fi
-
-                  # install notification plugin
-                  if ! $(wp plugin is-installed notification --allow-root); then
-                      wp plugin install notification --activate --allow-root
-                  fi
-
-                  # install duplicate post plugin
-                  if ! $(wp plugin is-installed duplicate-post --allow-root); then
-                      wp plugin install duplicate-post --activate --allow-root
-                  fi
-              mode: 000500
-              owner: root
-              group: root
-        build_wordpress_initialization:
-          files:
-            /tmp/install_wordpress_initialization.sh:
-              content:
-                !Sub |
-                  #!/bin/bash -xe
-                  directory="/var/www/wordpress/${WPDirectory}"
-                  cd "$directory"
-
-                  # set wordpress config
-                  wp config set DISALLOW_FILE_EDIT true --raw --type=constant --allow-root
-
-                  # set wordpress permalink structure
-                  wp rewrite structure "/%postname%/" --hard --allow-root
-
-                  # set wordpress options
-                  wp option update blog_public "0" --allow-root
-                  wp option update uploads_use_yearmonth_folders "0" --allow-root
-                  wp option update default_comment_status "closed" --allow-root
-                  wp option update default_ping_status "closed" --allow-root
-                  wp option update default_pingback_flag "0" --allow-root
-
-                  # set Media Cloud plugin options
-                  wp option update ilab-media-s3-access-key "${MediaUploadAccessKeyId}" --allow-root
-                  wp option update ilab-media-s3-bucket "${MediaUploadBucket}" --allow-root
-                  wp option update ilab-media-s3-cache-control "public,max-age=2592000" --allow-root
-                  if [ -n "${CdnUrl}" ]; then
-                    wp option update ilab-media-s3-cdn-base "${CdnUrl}" --allow-root
-                  fi
-                  wp option update ilab-media-s3-delete-uploads "on" --allow-root
-                  wp option update ilab-media-s3-display-s3-badge "on" --allow-root
-                  wp option update ilab-media-s3-prefix "uploads" --allow-root
-                  wp option update ilab-media-s3-region "${AWS::Region}" --allow-root
-                  wp option update ilab-media-s3-secret "${MediaUploadAccessKeySecret}" --allow-root
-                  wp option update ilab-media-storage-provider "s3" --allow-root
-                  wp option update ilab-media-tool-enabled-storage "1" --allow-root
-
-                  # set permission of wordpress site directories
-                  chown -R apache:apache "$directory"
-                  find "$directory" -type d -exec chmod 750 {} \;
-                  find "$directory" -type f -exec chmod 640 {} \;
-              mode: 000500
-              owner: root
-              group: root
-        install_cacheclient:
-          commands:
-            install_cacheclient:
-              command: ./install_cacheclient.sh
-              cwd: /tmp
-              ignoreErrors: false
-        install_aws_ini:
-          files:
-            /tmp/20-aws.ini:
-              source: !Ref PHPIniOverride
-              mode: 000500
-              owner: root
-              group: root
-          commands:
-            install_aws_ini:
-              command: cp "20-aws.ini" "/etc/php-7.0.d/"
-              cwd: /tmp
-              ignoreErrors: true
-        install_htaccess:
-          files:
-            /tmp/.htaccess:
-              source: https://s3.amazonaws.com/cf-coachella/wordpress/config-files/.htaccess
-              mode: 000500
-              owner: root
-              group: root
-            /tmp/.htaccess-uploads:
-              source: https://s3.amazonaws.com/cf-coachella/wordpress/config-files/.htaccess-uploads
-              mode: 000500
-              owner: root
-              group: root
-          commands:
-            install_htaccess:
-              command: !Sub cp .htaccess "/var/www/wordpress/${WPDirectory}/"
-              cwd: /tmp
-              ignoreErrors: false
-            install_htaccess_uploads:
-              command: !Sub mkdir -p "/var/www/wordpress/${WPDirectory}/wp-content/uploads" && cp .htaccess-uploads "/var/www/wordpress/${WPDirectory}/wp-content/uploads/.htaccess"
-              cwd: /tmp
-              ignoreErrors: false
-        install_opcache:
           commands:
             install_opcache:
               command: ./install_opcache.sh
               cwd: /tmp
               ignoreErrors: false
-        install_wordpress:
+        install_codedeploy_agent:
+          files:
+            /tmp/install_codedeploy.sh:
+              content:
+                !Sub |
+                  #!/bin/bash -xe
+                  cd /home/ec2-user
+
+                  until sudo service codedeploy-agent status >/dev/null 2>&1; do
+                    sleep 60
+                    rm -f codedeploy-agent-install
+                    wget -O codedeploy-agent-install https://aws-codedeploy-us-east-1.s3.amazonaws.com/latest/install
+                    chmod +x ./codedeploy-agent-install
+                    sudo ./codedeploy-agent-install auto
+                    sudo service codedeploy-agent restart
+                  done
+              mode: 000500
+              owner: root
+              group: root
           commands:
-            install_wordpress:
-              command: ./install_wordpress.sh
+            install_codedeploy:
+              command: ./install_codedeploy.sh
               cwd: /tmp
               ignoreErrors: false
-        install_wordpress_plugins:
-          commands:
-            install_wordpress_plugins:
-              command: ./install_wordpress_plugins.sh
-              cwd: /tmp
-              ignoreErrors: false
-        install_wordpress_initialization:
-          commands:
-            install_wordpress_initialization:
-              command: ./install_wordpress_initialization.sh
-              cwd: /tmp
-              ignoreErrors: false
-        start_webserver:
-          services:
-            sysvinit:
-              httpd:
-                enabled: true
-                ensureRunning: true
     Properties:
       IamInstanceProfile: !Ref WebInstanceProfile
       ImageId: !Ref LatestAmiId
@@ -816,7 +482,7 @@ Resources:
       InstanceType: !Ref WebInstanceType
       KeyName: !Ref EC2KeyName
       SecurityGroups:
-      - !Ref WebSecurityGroup
+        - !Ref WebSecurityGroup
       UserData:
         "Fn::Base64":
           !Sub |
