@@ -598,7 +598,7 @@ Conditions:
     - !Equals [ true, !Ref UseElastiCacheBoolean ]
     - !Condition AvailableAWSRegion
   MySqlDbEngine: !Equals [ 'mysql', !Ref DatabaseEngine ]
-  PrivateSubnetsEnabled: !Equals [ UsePrivateSubnets, true ]
+  PrivateSubnetsEnabled: !Equals [ !Ref UsePrivateSubnets, true ]
 
 Resources:
   BastionModule:
