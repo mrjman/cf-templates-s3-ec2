@@ -1,0 +1,280 @@
+---
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+  Creates codepipeline CI for deploying Coachella wordpress cms. Pulls code from
+  a git repository and deploys to a set of autoscaling groups.
+
+Metadata:
+  Author: Mondo Robot
+
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Github Parameters
+        Parameters:
+          - GithubOwnerAccount
+          - GithubOAuthToken
+          - GithubRepo
+          - GithubBranch
+      - Label:
+          default: CodePipeline
+        Parameters:
+          - PipelineBucket
+          - PipelineName
+      - Label:
+          default: CodeDeploy Parameters
+        Parameters:
+          - ApplicationName
+          - DeploymentGroupName
+          - AutoScalingGroups
+    ParameterLabels:
+      ApplicationName:
+        default: Application Name
+      AutoScalingGroups: Comma separated list of Auto Scaling Groups
+      DeploymentGroupName:
+        default: Deployment Group Name
+      GithubBranch:
+        default: GitHub Branch
+      GithubOAuthToken:
+        default: GitHub OAuth Token
+      GithubOwnerAccount:
+        default: GitHub Owner Account (Can be found in github url /<owner>/<repo>)
+      GithubRepo:
+        default: GitHub Repository (Can be found in github url /<owner>/<repo>)
+      PipelineBucket:
+        default: CodePipeline S3 Bucket Name
+      PipelineName:
+        default: CodePipeline Name
+
+Parameters:
+  ApplicationName:
+    Description: The name of the application to deploy
+    Type: String
+  AutoScalingGroups:
+    Default: ''
+    Description: Comma separated list of autoscaling group names to deploy to
+    Type: CommaDelimitedList
+  DeploymentGroupName:
+    AllowedValues: [dev, stg, prod]
+    Description: The name for the deployment group
+    Type: String
+  GithubBranch:
+    Description: Github branch
+    Default: develop
+    Type: String
+  GithubOAuthToken:
+    Description: Personal access token attached to the github account for repo access
+    NoEcho: true
+    Type: String
+  GithubOwnerAccount:
+    Description: Github owner account. Can be found in github url /<owner>/<repo>
+    Default: mondorobot
+    Type: String
+  GithubRepo:
+    Default: coa.website
+    Description: Githut repo name. Can be found in github url /<owner>/<repo>
+    Type: String
+  PipelineBucket:
+    Default: ''
+    Description: The bucket name to store pipeline artifacts
+    Type: String
+  PipelineName:
+    Default: coachella-static-pipeline
+    Description: The name of the code pipeline
+    Type: String
+
+Conditions:
+  HasAutoScalingGroups: !Not [ !Equals [ '', !Select [ 0, !Split [ ',', Ref AutoScalingGroups ] ] ] ]
+  HasPipelineBucket: !Not [ !Equals [ '', !Ref PipelineBucket ] ]
+
+Resources:
+  CodeDeployRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - 'codedeploy.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      Path: /service-role/
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'autoscaling:CompleteLifecycleAction'
+                  - 'autoscaling:DeleteLifecycleHook'
+                  - 'autoscaling:DescribeAutoScalingGroups'
+                  - 'autoscaling:DescribeLifecycleHooks'
+                  - 'autoscaling:PutLifecycleHook'
+                  - 'autoscaling:RecordLifecycleActionHeartbeat'
+                  - 'autoscaling:CreateAutoScalingGroup'
+                  - 'autoscaling:UpdateAutoScalingGroup'
+                  - 'autoscaling:EnableMetricsCollection'
+                  - 'autoscaling:DescribeAutoScalingGroups'
+                  - 'autoscaling:DescribePolicies'
+                  - 'autoscaling:DescribeScheduledActions'
+                  - 'autoscaling:DescribeNotificationConfigurations'
+                  - 'autoscaling:DescribeLifecycleHooks'
+                  - 'autoscaling:SuspendProcesses'
+                  - 'autoscaling:ResumeProcesses'
+                  - 'autoscaling:AttachLoadBalancers'
+                  - 'autoscaling:PutScalingPolicy'
+                  - 'autoscaling:PutScheduledUpdateGroupAction'
+                  - 'autoscaling:PutNotificationConfiguration'
+                  - 'autoscaling:PutLifecycleHook'
+                  - 'autoscaling:DescribeScalingActivities'
+                  - 'autoscaling:DeleteAutoScalingGroup'
+                  - 'ec2:DescribeInstances'
+                  - 'ec2:DescribeInstanceStatus'
+                  - 'ec2:TerminateInstances'
+                  - 'tag:GetTags'
+                  - 'tag:GetResources'
+                  - 'sns:Publish'
+                  - 'cloudwatch:DescribeAlarms'
+                  - 'cloudwatch:PutMetricAlarm'
+                  - 'elasticloadbalancing:DescribeLoadBalancers'
+                  - 'elasticloadbalancing:DescribeInstanceHealth'
+                  - 'elasticloadbalancing:RegisterInstancesWithLoadBalancer'
+                  - 'elasticloadbalancing:DeregisterInstancesFromLoadBalancer'
+                  - 'elasticloadbalancing:DescribeTargetGroups'
+                  - 'elasticloadbalancing:DescribeTargetHealth'
+                  - 'elasticloadbalancing:RegisterTargets'
+                  - 'elasticloadbalancing:DeregisterTargets'
+                Resource: '*'
+  CodeDeploy:
+      Type: AWS::CodeDeploy::Application
+      Properties:
+        ApplicationName: !Ref ApplicationName
+  CodeDeployDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName: !Ref CodeDeploy
+      AutoScalingGroups: !If [ HasAutoScalingGroups, !Ref AutoScalingGroups, !Ref 'AWS::NoValue' ]
+      DeploymentConfigName: CodeDeployDefault.OneAtATime
+      DeploymentGroupName: !Ref DeploymentGroupName
+      ServiceRoleArn: !GetAtt CodeDeployRole.Arn
+  CodePipeline:
+    Type: 'AWS::CodePipeline::Pipeline'
+    Properties:
+      ArtifactStore:
+        Location: !Ref CodePipelineBucket
+        Type: S3
+      Name: !Ref PipelineName
+      RoleArn: !GetAtt CodePipelineRole.Arn
+      Stages:
+        - Name: Source
+          Actions:
+            - ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Provider: GitHub
+                Version: '1'
+              Configuration:
+                Branch: !Ref GithubBranch
+                Owner: !Ref GithubOwnerAccount
+                Repo: !Ref GithubRepo
+                OAuthToken: !Ref GithubOAuthToken
+                PollForSourceChanges: false
+              OutputArtifacts:
+                - Name: AppSource
+              Name: SourceAction
+        - Name: Deploy
+          Actions:
+            - ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Version: '1'
+                Provider: CodeDeploy
+              Configuration:
+                ApplicationName: !Ref CodeDeploy
+                DeploymentGroupName: !Ref CodeDeployDeploymentGroup
+              InputArtifacts:
+                - Name: AppSource
+              Name: DeployAction
+  CodePipelineBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !If [ HasPipelineBucket, !Ref PipelineBucket, !Ref 'AWS::NoValue' ]
+  CodePipelineRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:GetObjectVersion'
+                  - 's3:GetBucketVersioning'
+                  - 's3:PutObject'
+                Resource:
+                  - !GetAtt CodePipelineBucket.Arn
+                  - !Sub '${CodePipelineBucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - 'autoscaling:DescribeAutoScalingGroups'
+                  - 'autoscaling:DescribeLaunchConfigurations'
+                  - 'autoscaling:DescribeScalingActivities'
+                  - 'autoscaling:ResumeProcesses'
+                  - 'autoscaling:SuspendProcesses'
+                  - 'ec2:DescribeInstances'
+                  - 'ec2:DescribeImages'
+                  - 'ec2:DescribeAddresses'
+                  - 'ec2:DescribeSubnets'
+                  - 'ec2:DescribeVpcs'
+                  - 'ec2:DescribeSecurityGroups'
+                  - 'ec2:DescribeKeyPairs'
+                  - 'elasticloadbalancing:DescribeLoadBalancers'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'codedeploy:CreateDeployment'
+                  - 'codedeploy:GetApplicationRevision'
+                  - 'codedeploy:GetDeployment'
+                  - 'codedeploy:GetDeploymentConfig'
+                  - 'codedeploy:RegisterApplicationRevision'
+                Resource: '*'
+  CodePipelineGithubWebhook:
+    Type: 'AWS::CodePipeline::Webhook'
+    Properties:
+      AuthenticationConfiguration:
+        SecretToken: !Ref GithubOAuthToken
+      Filters:
+        - JsonPath: "$.ref"
+          MatchEquals: refs/heads/{Branch}
+      Authentication: GITHUB_HMAC
+      TargetPipeline: !Ref CodePipeline
+      TargetAction: SourceAction
+      Name: !Sub ${CodePipeline}-github-webhook
+      TargetPipelineVersion: !GetAtt CodePipeline.Version
+      RegisterWithThirdParty: true
+
+Outputs:
+  PipelineName:
+    Description: The name of the codepipeline
+    Value: !Ref CodePipeline
+  PipelineBucket:
+    Description: The bucket holding the code pipeline artifacts
+    Value: !Ref CodePipelineBucket
+  PipelineBucketArn:
+    Description: The ARN of the code pipeline bucket
+    Value: !GetAtt CodePipelineBucket.Arn
