@@ -120,11 +120,11 @@ Metadata:
 
 Parameters:
   ApiArtistsUrl:
-    Default: 'https://s3.amazonaws.com/goeventweb-static.greencopper.com/8b22db9b97ce4d4b864a42f401f87e73/coachella-2018/data/eng/artists.json'
+    Default: 'https://s3.amazonaws.com/goeventweb-static.greencopper.com/a01405de1df74e27bf13f23a26670c9b/coachella-2019/data/eng/artists.json'
     Description: Arists data url
     Type: String
   ApiArtistMediaUrl:
-    Default: 'https://goevent-images.s3.amazonaws.com/coachella-2018/1958aa84/web'
+    Default: 'https://goevent-images.s3.amazonaws.com/coachella-2019/f3241018/web'
     Description: Arists data url
     Type: String
   ApiBaseUrl:
