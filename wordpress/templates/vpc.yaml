@@ -283,7 +283,7 @@ Conditions:
   CreateNat3: !And [ !Condition AZ3, !Condition PrivateSubnetsEnabled ]
   CreateNat4: !And [ !Condition AZ4, !Condition PrivateSubnetsEnabled ]
   CreateNat5: !And [ !Condition AZ5, !Condition PrivateSubnetsEnabled ]
-  PrivateSubnetsEnabled: !Equals [ UsePrivateSubnets, true ]
+  PrivateSubnetsEnabled: !Equals [ !Ref UsePrivateSubnets, true ]
 
 Resources:
 
