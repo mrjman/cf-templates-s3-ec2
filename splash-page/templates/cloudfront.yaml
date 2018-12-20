@@ -11,6 +11,7 @@ Metadata:
       - Label:
           default: CloudFront Parameters
         Parameters:
+          - Aliases
           - DomainName
           - S3WebsiteOriginDomain
           - CertificateArn
@@ -20,6 +21,10 @@ Metadata:
         Parameters:
           - SecurityHeadersLambdaVersionArn
 Parameters:
+  Aliases:
+    Default: ''
+    Description: Comma separated list of alias domains
+    Type: CommaDelimitedList
   CertificateArn:
     Description: Amazon Resource Name (ARN) of an AWS Certificate Manager (ACM) certificate
     Type: String
@@ -43,6 +48,7 @@ Parameters:
     Type: String
 
 Conditions:
+  HasAliases: !Not [ !Equals [ !Select [ 0, !Ref Aliases ], '' ] ]
   HasDomainName: !Not [ !Equals [ '', !Ref DomainName ] ]
   HasSecurityHeaders: !Not [ !Equals [ '', !Ref SecurityHeadersLambdaVersionArn ] ]
   UseDefaultCert: !Equals [ '', !Ref CertificateArn ]
@@ -53,7 +59,13 @@ Resources:
     Properties:
       DistributionConfig:
         Aliases:
-          - !If [ HasDomainName, !Ref DomainName, !Ref 'AWS::NoValue' ]
+          !If
+          - HasAliases
+          - !Ref Aliases
+          - - !If
+              - HasDomainName
+              - !Ref DomainName
+              - !Ref 'AWS::NoValue'
         Comment: !Ref 'AWS::StackName'
         DefaultCacheBehavior:
           AllowedMethods: [GET, HEAD, OPTIONS]
