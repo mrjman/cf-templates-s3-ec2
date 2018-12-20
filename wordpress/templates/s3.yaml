@@ -12,8 +12,6 @@ Metadata:
         default: Access Control
       BucketName:
         default: Bucket Name
-      Environment:
-        default: Environment
 
 Parameters:
   AccessControl:
@@ -32,11 +30,6 @@ Parameters:
     Type: String
   BucketName:
     Description: The name for the bucket
-    Type: String
-  Environment:
-    AllowedValues: [develop, staging, production]
-    Default: develop
-    Description: The development environment
     Type: String
 
 Conditions:
