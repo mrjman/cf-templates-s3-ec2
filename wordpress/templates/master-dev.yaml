@@ -330,6 +330,7 @@ Parameters:
     Type: String
   DatabaseName:
     AllowedPattern: ^([a-zA-Z0-9]*)$
+    Default: coachella
     Description: The Amazon RDS master database name.
     Type: String
   DatabaseRestoreSnapshot:
@@ -573,8 +574,9 @@ Parameters:
       - 4.7.4
       - 4.8.2
       - 4.9.8
+      - 4.9.9
       - 5.0
-    Default: 4.9.8
+    Default: 4.9.9
     Description: The WordPress version (make sure this version is compatible with the PHP version selected above).
     Type: String
 
@@ -676,7 +678,6 @@ Resources:
       Parameters:
         AccessControl: PublicRead
         BucketName: !Ref S3MediaBucketName
-        Environment: !Ref Environment
       TemplateURL: https://s3.amazonaws.com/cf-coachella/wordpress/s3.yaml
   S3MediaUploadEndpointModule:
     Condition: PrivateSubnetsEnabled
@@ -684,7 +685,6 @@ Resources:
     Properties:
       Parameters:
         RouteTableIds: !GetAtt VpcModule.Outputs.NatRouteTable
-        S3Bucket: !GetAtt S3MediaUploadModule.Outputs.Name
         VpcId: !GetAtt VpcModule.Outputs.Vpc
       TemplateURL: https://s3.amazonaws.com/cf-coachella/wordpress/s3-endpoint.yaml
   SecurityGroupsModule:
