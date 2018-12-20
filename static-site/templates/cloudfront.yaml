@@ -11,6 +11,7 @@ Metadata:
       - Label:
           default: CloudFront Parameters
         Parameters:
+          - Aliases
           - DomainName
           - S3WebsiteOriginDomain
           - ErrorDocumentPath
@@ -23,6 +24,10 @@ Metadata:
           - SecurityHeadersLambdaVersionArn
 
 Parameters:
+  Aliases:
+    Default: ''
+    Description: Comma separated list of alias domains
+    Type: CommaDelimitedList
   BasicAuthLambdaVersionArn:
     Default: ''
     Description: Amazon Resource Name (ARN) of the Lambda function version implementing basic auth
@@ -55,6 +60,7 @@ Parameters:
 
 
 Conditions:
+  HasAliases: !Not [ !Equals [ !Select [ 0, !Ref Aliases ], '' ] ]
   HasBasicAuth: !Not [ !Equals [ '', !Ref BasicAuthLambdaVersionArn ] ]
   HasDomainName: !Not [ !Equals [ '', !Ref DomainName ] ]
   HasSecurityHeaders: !Not [ !Equals [ '', !Ref SecurityHeadersLambdaVersionArn ] ]
@@ -66,7 +72,13 @@ Resources:
     Properties:
       DistributionConfig:
         Aliases:
-          - !If [ HasDomainName, !Ref DomainName, !Ref 'AWS::NoValue' ]
+          !If
+          - HasAliases
+          - !Ref Aliases
+          - - !If
+              - HasDomainName
+              - !Ref DomainName
+              - !Ref 'AWS::NoValue'
         Comment: !Ref 'AWS::StackName'
         CustomErrorResponses:
           - ErrorCachingMinTTL: 30
