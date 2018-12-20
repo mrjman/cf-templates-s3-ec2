@@ -143,6 +143,7 @@ Resources:
             Id: elb
             CustomOriginConfig:
               OriginProtocolPolicy: !If [ UseDefaultCert, 'http-only', 'https-only' ]
+              # OriginProtocolPolicy: 'http-only'
           - !If
             - HasMediaBucket
             - DomainName: !Ref S3MediaBucketOrigin
