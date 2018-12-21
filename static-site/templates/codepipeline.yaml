@@ -38,6 +38,8 @@ Metadata:
           - ApiMediaUrl
           - ApiArtistsUrl
           - ApiArtistMediaUrl
+          - GTMIds
+          - GAIds
     ParameterLabels:
       ApiArtistsUrl:
         default: Artists API URL
@@ -57,6 +59,8 @@ Metadata:
         default: Build Image
       BuildType:
         default: Build Machine Type
+      GAIds:
+        default: '[Optional] Comma separated list of Google Analytics IDs'
       GithubBranch:
         default: GitHub Branch
       GithubOAuthToken:
@@ -65,6 +69,8 @@ Metadata:
         default: GitHub Owner Account (Can be found in github url /<owner>/<repo>)
       GithubRepo:
         default: GitHub Repository (Can be found in github url /<owner>/<repo>)
+      GTMIds:
+        default: '[Optional] Comma separated list of Google Tag Manager IDs'
       PipelineBucket:
         default: CodePipeline S3 Bucket Name
       PipelineName:
@@ -117,6 +123,10 @@ Parameters:
     Default: LINUX_CONTAINER
     Description: Build machine type
     Type: String
+  GAIds:
+    Default: ''
+    Description: Comma separated list of Google Analytics IDs
+    Type: String
   GithubBranch:
     Description: Github branch
     Default: develop
@@ -132,6 +142,10 @@ Parameters:
   GithubRepo:
     Default: coa.website
     Description: Githut repo name. Can be found in github url /<owner>/<repo>
+    Type: String
+  GTMIds:
+    Default: ''
+    Description: Comma separated list of Google Tag Manager IDs
     Type: String
   PipelineBucket:
     Default: ''
@@ -149,6 +163,8 @@ Parameters:
     Type: String
 
 Conditions:
+  HasGAIds: !Not [ !Equals [ '', !Ref GAIds ] ]
+  HasGTMIds: !Not [ !Equals [ '', !Ref GTMIds ] ]
   HasPipelineBucket: !Not [ !Equals [ '', !Ref PipelineBucket ] ]
 
 Resources:
@@ -184,6 +200,20 @@ Resources:
           - Name: NUXT_ENV_GC_IMAGES
             Value: !Ref ApiArtistMediaUrl
             Type: PLAINTEXT
+          - !If
+            - HasGTMIds
+            -
+              Name: NUXT_GTM_ID
+              Value: !Ref GTMIds
+              Type: PLAINTEXT
+            - !Ref 'AWS::NoValue'
+          - !If
+            - HasGAIds
+            -
+              Name: NUXT_GA_IDS
+              Value: !Ref GAIds
+              Type: PLAINTEXT
+            - !Ref 'AWS::NoValue'
         Image: !Ref BuildImage
         Type: !Ref BuildType
       Name: !Sub ${AWS::StackName}-CodeBuild

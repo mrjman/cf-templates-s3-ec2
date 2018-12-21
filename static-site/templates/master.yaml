@@ -45,6 +45,8 @@ Metadata:
           - ApiMediaUrl
           - ApiArtistsUrl
           - ApiArtistMediaUrl
+          - GTMIds
+          - GAIds
       - Label:
           default: Basic Auth Parameters
         Parameters:
@@ -92,8 +94,8 @@ Metadata:
         default: Site Domain Name
       ErrorDocument:
         default: Error Document Path (e.g. 404.html)
-      IndexDocument:
-        default: Index Document (e.g. index.html)
+      GAIds:
+        default: '[Optional] Comma separated list of Google Analytics IDs'
       GithubBranch:
         default: GitHub Branch
       GithubOAuthToken:
@@ -102,6 +104,10 @@ Metadata:
         default: GitHub Owner Account (Can be found in github url /<owner>/<repo>)
       GithubRepo:
         default: GitHub Repository (Can be found in github url /<owner>/<repo>)
+      GTMIds:
+        default: '[Optional] Comma separated list of Google Tag Manager IDs'
+      IndexDocument:
+        default: Index Document (e.g. index.html)
       PipelineBucket:
         default: CodePipeline S3 Bucket Name
       PipelineName:
@@ -196,9 +202,9 @@ Parameters:
     Default: 404.html
     Description: The error document to load when pages not found
     Type: String
-  IndexDocument:
-    Default: index.html
-    Description: The root document of the directory
+  GAIds:
+    Default: ''
+    Description: Comma separated list of Google Analytics IDs
     Type: String
   GithubBranch:
     Description: Github branch
@@ -215,6 +221,14 @@ Parameters:
   GithubRepo:
     Default: coa.website
     Description: Githut repo name. Can be found in github url /<owner>/<repo>
+    Type: String
+  GTMIds:
+    Default: ''
+    Description: Comma separated list of Google Tag Manager IDs
+    Type: String
+  IndexDocument:
+    Default: index.html
+    Description: The root document of the directory
     Type: String
   PipelineBucket:
     Default: ''
@@ -293,10 +307,12 @@ Resources:
         BuildType: !Ref BuildType
         BuildComputeType: !Ref BuildComputeType
         BuildImage: !Ref BuildImage
+        GAIds: !Ref GAIds
         GithubOwnerAccount: !Ref GithubOwnerAccount
         GithubOAuthToken: !Ref GithubOAuthToken
         GithubRepo: !Ref GithubRepo
         GithubBranch: !Ref GithubBranch
+        GTMIds: !Ref GTMIds
         PipelineBucket: !Ref PipelineBucket
         PipelineName: !Ref PipelineName
         WebsiteBucketArn: !GetAtt S3SiteBucketModule.Outputs.Arn
