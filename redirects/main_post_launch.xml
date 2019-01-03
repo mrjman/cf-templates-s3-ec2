@@ -31,7 +31,7 @@
     <Redirect>
       <HostName>coachella.com</HostName>
       <HttpRedirectCode>302</HttpRedirectCode>
-      <ReplaceKeyWith>buying-passes</ReplaceKeyWith>
+      <ReplaceKeyWith>advance-sale-2019</ReplaceKeyWith>
       <Protocol>https</Protocol>
     </Redirect>
   </RoutingRule>
