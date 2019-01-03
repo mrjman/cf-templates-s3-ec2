@@ -1,0 +1,13 @@
+<RoutingRules>
+  <RoutingRule>
+    <Condition>
+      <KeyPrefixEquals/>
+      <HttpErrorCodeReturnedEquals>404</HttpErrorCodeReturnedEquals>
+    </Condition>
+    <Redirect>
+      <Protocol>https</Protocol>
+      <HostName>2018.coachella.com</HostName>
+      <HttpRedirectCode>302</HttpRedirectCode>
+    </Redirect>
+  </RoutingRule>
+</RoutingRules>
