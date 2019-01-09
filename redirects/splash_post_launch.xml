@@ -1,0 +1,9 @@
+<RoutingRules>
+  <RoutingRule>
+    <Redirect>
+      <Protocol>https</Protocol>
+      <HostName>coachella.com</HostName>
+      <HttpRedirectCode>302</HttpRedirectCode>
+    </Redirect>
+  </RoutingRule>
+</RoutingRules>
