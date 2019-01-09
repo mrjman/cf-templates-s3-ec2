@@ -18,6 +18,7 @@ Metadata:
         Parameters:
           - RedirectConditionStatusCode
           - RedirectHostName
+          - RedirectProtocol
           - RedirectStatusCode
     ParameterLabels:
       BucketName:
@@ -30,6 +31,8 @@ Metadata:
         default: Redirect Condition Status Code
       RedirectHostName:
         default: Redirect Hostname
+      RedirectProtocol:
+        default: Redirect Protocol (specify to force specific protocol)
       RedirectStatusCode:
         default: Redirect Status Code
 Parameters:
@@ -52,6 +55,10 @@ Parameters:
     Default: ''
     Description: The hostname to redirect to
     Type: String
+  RedirectProtocol:
+    Default: https
+    Description: The protocol to use when redirecting
+    Type: String
   RedirectStatusCode:
     AllowedValues: [301, 302, 303, 307]
     Default: 302
@@ -63,6 +70,7 @@ Conditions:
   HasErrorDocument: !Not [ !Equals [ '', !Ref ErrorDocument ] ]
   HasRedirectRule: !Not [ !Equals [ '', !Ref RedirectHostName ] ]
   HasRedirectCondition: !Not [ !Equals [ '', !Ref RedirectConditionStatusCode ] ]
+  HasRedirectProtocol: !Not [ !Equals ['', !Ref RedirectProtocol ] ]
 
 Resources:
   WebsiteBucket:
@@ -83,6 +91,7 @@ Resources:
                 RedirectRule:
                   HostName: !Ref RedirectHostName
                   HttpRedirectCode: !Ref RedirectStatusCode
+                  Protocol: !If [ HasRedirectProtocol, !Ref RedirectProtocol, !Ref 'AWS::NoValue' ]
                 RoutingRuleCondition:
                   !If
                     - HasRedirectCondition

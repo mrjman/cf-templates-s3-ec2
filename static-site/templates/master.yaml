@@ -21,6 +21,7 @@ Metadata:
           - IndexDocument
           - ErrorDocument
           - RedirectHostName
+          - RedirectProtocol
           - RedirectStatusCode
       - Label:
           default: CloudFront Parameters
@@ -116,6 +117,8 @@ Metadata:
         default: CloudFront Price Class
       RedirectHostName:
         default: Redirect Hostname
+      RedirectProtocol:
+        default: Redirect Protocol (specify to force specific protocol)
       RedirectStatusCode:
         default: Redirect Status Code
       SecurityHeadersEnable:
@@ -250,6 +253,10 @@ Parameters:
     Default: ''
     Description: The hostname to redirect to
     Type: String
+  RedirectProtocol:
+    Default: https
+    Description: The protocol to use when redirecting (http, https)
+    Type: String
   RedirectStatusCode:
     AllowedValues: [301, 302, 303, 307]
     Default: 302
@@ -349,6 +356,7 @@ Resources:
         IndexDocument: !Ref IndexDocument
         ErrorDocument: !If [ HasLeadingSlashErrorDocument, !Select [ 1, !Split [ '/', !Ref ErrorDocument ] ], !Ref ErrorDocument ]
         RedirectHostName: !Ref RedirectHostName
+        RedirectProtocol: !Ref RedirectProtocol
         RedirectStatusCode: !Ref RedirectStatusCode
       TemplateURL: https://s3.amazonaws.com/cf-coachella/static-site/s3-website.yaml
 
