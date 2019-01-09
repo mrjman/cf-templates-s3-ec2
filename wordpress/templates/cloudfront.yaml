@@ -13,11 +13,14 @@ Metadata:
           default: AWS Parameters
         Parameters:
           - CloudFrontAcmCertificate
+          - Aliases
           - WPDomainName
           - PublicAlbDnsName
           - S3MediaBucketOrigin
           - PriceClass
     ParameterLabels:
+      Aliases:
+        default: Comma separated list of alias domains
       CloudFrontAcmCertificate:
         default: CloudFront Certificate ARN
       PriceClass:
@@ -30,6 +33,10 @@ Metadata:
         default: Domain name of the WordPress site
 
 Parameters:
+  Aliases:
+    Default: ''
+    Description: Comma separated list of alias domains
+    Type: CommaDelimitedList
   CloudFrontAcmCertificate:
     AllowedPattern: ^$|(arn:aws:acm:)([a-z0-9/:-])*([a-z0-9])$
     Description: '[ Optional ] The AWS Certification Manager certificate ARN for the CloudFront distribution certificate - this certificate should be created in the us-east-1 (N. Virginia) region and must reference the WordPress domain name you use below.'
@@ -51,7 +58,8 @@ Parameters:
     Type: String
 
 Conditions:
-  HasDomain: !Not [ !Equals [ '', !Ref WPDomainName ] ]
+  HasAliases: !Not [ !Equals [ !Select [ 0, !Ref Aliases ], '' ] ]
+  HasDomainName: !Not [ !Equals [ '', !Ref WPDomainName ] ]
   HasMediaBucket: !Not [ !Equals [ '', !Ref S3MediaBucketOrigin ] ]
   UseDefaultCert: !Equals [ '', !Ref CloudFrontAcmCertificate ]
 
@@ -61,7 +69,13 @@ Resources:
     Properties:
       DistributionConfig:
         Aliases:
-          - !If [ HasDomain, !Join [ '', [ '*.', !Ref WPDomainName ] ], !Ref 'AWS::NoValue' ]
+          !If
+          - HasAliases
+          - !Ref Aliases
+          - - !If
+              - HasDomainName
+              - !Ref WPDomainName
+              - !Ref 'AWS::NoValue'
         CacheBehaviors:
           - PathPattern: wp-includes/*
             AllowedMethods:
