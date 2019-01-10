@@ -191,4 +191,16 @@
       <Protocol>https</Protocol>
     </Redirect>
   </RoutingRule>
+  <RoutingRule>
+    <Condition>
+      <KeyPrefixEquals>playbook</KeyPrefixEquals>
+      <HttpErrorCodeReturnedEquals>404</HttpErrorCodeReturnedEquals>
+    </Condition>
+    <Redirect>
+      <Protocol>https</Protocol>
+      <HostName>goldenvoice-media.com</HostName>
+      <ReplaceKeyWith>coachella-playbook#coachella-playbook-2019</ReplaceKeyWith>
+      <HttpRedirectCode>302</HttpRedirectCode>
+    </Redirect>
+  </RoutingRule>
 </RoutingRules>
