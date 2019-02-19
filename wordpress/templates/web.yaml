@@ -692,6 +692,11 @@ Resources:
                   if ! $(wp plugin is-installed duplicate-post --allow-root); then
                       wp plugin install duplicate-post --activate --allow-root
                   fi
+
+                  # install revisionize plugin
+                  if ! $(wp plugin is-installed revisionize --allow-root); then
+                      wp plugin install revisionize --activate --allow-root
+                  fi
               mode: 000500
               owner: root
               group: root
@@ -1014,6 +1019,11 @@ Resources:
                   # install duplicate post plugin
                   if ! $(wp plugin is-installed duplicate-post --allow-root); then
                       wp plugin install duplicate-post --activate --allow-root
+                  fi
+
+                  # install revisionize plugin
+                  if ! $(wp plugin is-installed revisionize --allow-root); then
+                      wp plugin install revisionize --activate --allow-root
                   fi
               mode: 000500
               owner: root
@@ -1352,6 +1362,11 @@ Resources:
                   # install duplicate post plugin
                   if ! $(wp plugin is-installed duplicate-post --allow-root); then
                       wp plugin install duplicate-post --activate --allow-root
+                  fi
+
+                  # install revisionize plugin
+                  if ! $(wp plugin is-installed revisionize --allow-root); then
+                      wp plugin install revisionize --activate --allow-root
                   fi
               mode: 000500
               owner: root
