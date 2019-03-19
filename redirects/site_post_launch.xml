@@ -145,6 +145,30 @@
   </RoutingRule>
   <RoutingRule>
     <Condition>
+      <KeyPrefixEquals>lostandfound</KeyPrefixEquals>
+      <HttpErrorCodeReturnedEquals>404</HttpErrorCodeReturnedEquals>
+    </Condition>
+    <Redirect>
+      <HostName>coachella.com</HostName>
+      <HttpRedirectCode>302</HttpRedirectCode>
+      <ReplaceKeyWith>services/lost-found</ReplaceKeyWith>
+      <Protocol>https</Protocol>
+    </Redirect>
+  </RoutingRule>
+  <RoutingRule>
+    <Condition>
+      <KeyPrefixEquals>lost-found</KeyPrefixEquals>
+      <HttpErrorCodeReturnedEquals>404</HttpErrorCodeReturnedEquals>
+    </Condition>
+    <Redirect>
+      <HostName>coachella.com</HostName>
+      <HttpRedirectCode>302</HttpRedirectCode>
+      <ReplaceKeyWith>services/lost-found</ReplaceKeyWith>
+      <Protocol>https</Protocol>
+    </Redirect>
+  </RoutingRule>
+  <RoutingRule>
+    <Condition>
       <KeyPrefixEquals>guidebook/festival-directory</KeyPrefixEquals>
       <HttpErrorCodeReturnedEquals>404</HttpErrorCodeReturnedEquals>
     </Condition>
