@@ -697,11 +697,6 @@ Resources:
                   if ! $(wp plugin is-installed revisionize --allow-root); then
                       wp plugin install revisionize --activate --allow-root
                   fi
-
-                  # install intentionally blank wordpress theme
-                  if ! $(wp theme is-installed intentionally-blank --allow-root); then
-                      wp theme install intentionally-blank --activate --allow-root
-                  fi
               mode: 000500
               owner: root
               group: root
@@ -1029,11 +1024,6 @@ Resources:
                   # install revisionize plugin
                   if ! $(wp plugin is-installed revisionize --allow-root); then
                       wp plugin install revisionize --activate --allow-root
-                  fi
-
-                  # install intentionally blank wordpress theme
-                  if ! $(wp theme is-installed intentionally-blank --allow-root); then
-                      wp theme install intentionally-blank --activate --allow-root
                   fi
               mode: 000500
               owner: root
@@ -1377,11 +1367,6 @@ Resources:
                   # install revisionize plugin
                   if ! $(wp plugin is-installed revisionize --allow-root); then
                       wp plugin install revisionize --activate --allow-root
-                  fi
-
-                  # install intentionally blank wordpress theme
-                  if ! $(wp theme is-installed intentionally-blank --allow-root); then
-                      wp theme install intentionally-blank --activate --allow-root
                   fi
               mode: 000500
               owner: root
