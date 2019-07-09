@@ -1,4 +1,4 @@
-# coa.cf-templates
+# cf-templates-s3-ec2
 ### Overview
 This repository contains CloudFormation templates for building the resources required for a wordpress ec2 cluster and static s3 site. The templates are broken out into subfolders with each corresponding to a part of the overall build. The sections below will provide more details on each.
 
